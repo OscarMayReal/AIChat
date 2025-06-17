@@ -1,0 +1,39 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Thread {
+  id             String    @id @default(cuid())
+  name           String
+  createdAt      DateTime  @default(now())
+  ownerId        String
+  organizationId String?
+  messages       Message[]
+  private        Boolean @default(false)
+  updatedAt      DateTime @default(now())
+  projectId      String?
+  public         Boolean @default(false)
+
+
+  @@index([ownerId])
+  @@index([organizationId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  thread    Thread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  threadId  String
+  text      String   @db.Text
+  createdAt DateTime @default(now())
+  role      String
+  senderId  String?
+}

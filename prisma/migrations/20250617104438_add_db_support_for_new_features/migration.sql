@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "Message" ADD COLUMN     "senderId" TEXT;
+
+-- AlterTable
+ALTER TABLE "Thread" ADD COLUMN     "private" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "projectId" TEXT,
+ADD COLUMN     "public" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
