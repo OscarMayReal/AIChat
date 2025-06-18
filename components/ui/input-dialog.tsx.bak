@@ -39,6 +39,15 @@ type DialogContextType = {
 
 const DialogContext = createContext<DialogContextType | undefined>(undefined);
 
+export function useDialog() {
+  const context = useContext(DialogContext);
+  if (context === undefined) {
+    throw new Error('useDialog must be used within a DialogProvider');
+  }
+  return context;
+}
+
+// Dialog state type
 type DialogState = {
   isOpen: boolean;
   dialogProps: DialogOptions;
@@ -46,6 +55,7 @@ type DialogState = {
   resolveFn: ((value: string | null) => void) | null;
 };
 
+// Confirm dialog state type
 type ConfirmDialogState = {
   isOpen: boolean;
   confirmProps: ConfirmDialogOptions;
@@ -53,6 +63,7 @@ type ConfirmDialogState = {
 };
 
 export function DialogProvider({ children }: { children: ReactNode }) {
+  // Input dialog state
   const [dialogState, setDialogState] = useState<DialogState>({
     isOpen: false,
     dialogProps: { title: '' },
@@ -60,6 +71,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     resolveFn: null,
   });
   
+  // Confirm dialog state
   const [confirmState, setConfirmState] = useState<ConfirmDialogState>({
     isOpen: false,
     confirmProps: {
@@ -131,7 +143,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     }));
   }, [confirmState]);
 
-  const contextValue = useMemo(
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = React.useMemo(
     () => ({ showDialog, showConfirm }),
     [showDialog, showConfirm]
   );
@@ -143,85 +156,108 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       {/* Input Dialog */}
       <Dialog 
         open={dialogState.isOpen} 
-        onOpenChange={(open) => !open && handleDialogCancel()}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{dialogState.dialogProps.title}</DialogTitle>
-            {dialogState.dialogProps.description && (
-              <DialogDescription>{dialogState.dialogProps.description}</DialogDescription>
-            )}
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="dialog-input" className="text-right">
-                {dialogState.dialogProps.label || 'Input'}
-              </Label>
-              <Input
-                id="dialog-input"
-                value={dialogState.inputValue}
-                onChange={(e) => 
-                  setDialogState(prev => ({
-                    ...prev,
-                    inputValue: e.target.value
-                  }))
-                }
-                className="col-span-3"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleDialogConfirm();
-                  }
-                }}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={handleDialogCancel}
-            >
-              {dialogState.dialogProps.cancelText || 'Cancel'}
-            </Button>
-            <Button 
-              onClick={handleDialogConfirm}
-              disabled={dialogState.dialogProps.required && !dialogState.inputValue.trim()}
-            >
-              {dialogState.dialogProps.confirmText || 'Save'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Confirm Dialog */}
-      <Dialog 
-        open={confirmState.isOpen} 
-        onOpenChange={(open) => !open && handleConfirmDialog(false)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{confirmState.confirmProps.title}</DialogTitle>
-            {confirmState.confirmProps.description && (
-              <DialogDescription>
-                {confirmState.confirmProps.description}
+        onOpenChange={(open) => {
+        console.log('Dialog open state changed:', open);
+        if (!open) {
+          handleCancel();
+        }
+      }}>
+        <ErrorBoundary>
+          <DialogContent className="sm:max-w-[425px] bg-white shadow-xl rounded-lg">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-lg font-semibold text-gray-900">
+              {dialogProps.title}
+            </DialogTitle>
+            {dialogProps.description && (
+              <DialogDescription className="text-sm text-gray-500">
+                {dialogProps.description}
               </DialogDescription>
             )}
           </DialogHeader>
-          <DialogFooter className="mt-4">
+          <div className="py-4">
+            <div className="space-y-2">
+              <input
+                type="password"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={inputValue}
+                onChange={(e) => {
+                  console.log('Input value changed:', e.target.value);
+                  setInputValue(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    console.log('Enter key pressed');
+                    handleConfirm();
+                  }
+                  if (e.key === 'Escape') {
+                    console.log('Escape key pressed');
+                    handleCancel();
+                  }
+                }}
+                autoFocus
+                placeholder="Enter your API key..."
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex justify-end space-x-2">
             <Button 
               variant="outline" 
-              onClick={() => handleConfirmDialog(false)}
+              onClick={(e) => {
+                console.log('Cancel button clicked');
+                handleCancel();
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
-              {confirmState.confirmProps.cancelText}
+              Cancel
             </Button>
             <Button 
-              variant={confirmState.confirmProps.variant === 'destructive' ? 'destructive' : 'default'}
-              onClick={() => handleConfirmDialog(true)}
+              onClick={(e) => {
+                console.log('Save button clicked');
+                handleConfirm();
+              }}
+              disabled={!inputValue.trim()}
+              className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
+                inputValue.trim() 
+                  ? 'bg-blue-600 hover:bg-blue-700' 
+                  : 'bg-blue-300 cursor-not-allowed'
+              }`}
             >
-              {confirmState.confirmProps.confirmText}
+              Save
             </Button>
-          </DialogFooter>
-        </DialogContent>
+        </ErrorBoundary>
+      </Dialog>
+
+      {/* Confirm Dialog */}
+      <Dialog open={confirmState.isOpen} onOpenChange={(open) => {
+        console.log('Confirm dialog open state changed:', open);
+        if (!open) {
+          handleConfirmDialog(false);
+        }
+      }}>
+        <ErrorBoundary>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{confirmState.confirmProps.title}</DialogTitle>
+              {confirmState.confirmProps.description && (
+                <DialogDescription>{confirmState.confirmProps.description}</DialogDescription>
+              )}
+            </DialogHeader>
+            <DialogFooter className="mt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => handleConfirmDialog(false)}
+              >
+                {confirmState.confirmProps.cancelText}
+              </Button>
+              <Button 
+                variant={confirmState.confirmProps.variant === 'destructive' ? 'destructive' : 'default'}
+                onClick={() => handleConfirmDialog(true)}
+              >
+                {confirmState.confirmProps.confirmText}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </ErrorBoundary>
       </Dialog>
     </DialogContext.Provider>
   );
@@ -230,10 +266,12 @@ export function DialogProvider({ children }: { children: ReactNode }) {
 export function useInputDialog() {
   const context = useContext(DialogContext);
   
+  // Throw error if used outside of provider in development
   if (process.env.NODE_ENV !== 'production' && !context) {
     console.error('useInputDialog must be used within a DialogProvider');
   }
   
+  // Return mock implementation if context is not available
   if (!context) {
     return {
       showDialog: async (options: DialogOptions) => {

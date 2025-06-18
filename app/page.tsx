@@ -45,7 +45,7 @@ const components = {
     },
     projectPage: (props: IDockviewPanelProps<ProjectPageProps>) => {
         return (
-            <ProjectPage project={props.params.project} />
+            <ProjectPage project={props.params.project} api={props.api} />
         )
     },
     library: (props: IDockviewPanelProps) => {
@@ -82,36 +82,127 @@ const components = {
 
 const tabComponents = {
   projectPage: (props: IDockviewPanelHeaderProps<ProjectPageProps>) => {
+    const [project, setProject] = React.useState<ProjectPageProps['project'] | null>(props.params?.project || null);
+    
+    // Handle parameter updates and project changes
+    React.useEffect(() => {
+      // Update local state when parameters change
+      const handleParametersChange = (event: { parameters: ProjectPageProps }) => {
+        if (event?.parameters?.project) {
+          setProject(event.parameters.project);
+          props.api.setTitle(event.parameters.project.name || 'Project');
+        }
+      };
+      
+      // Listen for project updates from other components
+      const handleProjectUpdate = (event: CustomEvent) => {
+        if (event.detail?.projectId && (!project || event.detail.projectId === project.id)) {
+          const updatedProject = { 
+            ...(project || {}), 
+            ...event.detail,
+            name: event.detail.name,
+            id: event.detail.projectId 
+          };
+          setProject(updatedProject);
+          props.api.setTitle(event.detail.name);
+          // Update the tab parameters to persist the change
+          props.api.updateParameters({ project: updatedProject });
+        }
+      };
+      
+      // Set initial title from parameters
+      if (props.params?.project?.name) {
+        props.api.setTitle(props.params.project.name);
+      } else {
+        props.api.setTitle('Project');
+      }
+      
+      // Set up event listeners
+      const projectUpdatedListener = handleProjectUpdate as EventListener;
+      window.addEventListener('project-updated', projectUpdatedListener);
+      
+      // Handle parameter changes with proper typing
+      const parameterChangeHandler = (e: any) => {
+        handleParametersChange({ parameters: e });
+      };
+      
+      props.api.onDidParametersChange(parameterChangeHandler);
+      
+      // Cleanup function
+      return () => {
+        window.removeEventListener('project-updated', projectUpdatedListener);
+        // Use the same function reference for cleanup
+        props.api.onDidParametersChange(parameterChangeHandler);
+      };
+    }, [project?.id, props.api, props.params?.project]);
+    
     return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+        height: '100%',
+        padding: '0 8px',
+        gap: '8px',
+      }}>
         <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          fontSize: '12px',
+          fontWeight: 500,
+          color: 'var(--dv-tab-active-text-color)',
+          height: '100%',
+          overflow: 'hidden',
+          flex: 1,
+        }}>
+          <FolderOpenIcon size={14} style={{ flexShrink: 0 }} />
+          <span style={{
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: 'inline-block',
+            lineHeight: '1.5',
+          }} title={project?.name || 'Project'}>
+            {project?.name || 'Project'}
+          </span>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            props.api.close();
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--dv-inactivegroup-visiblepanel-tab-color)',
+            cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            width: '100%',
-            padding: '0 10px',
-        }}>
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '12px',
-                fontWeight: 500,
-                color: '#3f3f46',
-            }}>
-                <FolderOpenIcon size={14} />
-                <span>{props.params.project?.name || 'Project'}</span>
-            </div>
-            <div className="group">
-                <XIcon
-                    size={14}
-                    className="text-gray-400 hover:text-gray-600 cursor-pointer"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        props.api.close();
-                    }}
-                />
-            </div>
-        </div>
+            justifyContent: 'center',
+            width: '16px',
+            height: '16px',
+            borderRadius: '2px',
+            flexShrink: 0,
+            padding: 0,
+            margin: 0,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--dv-tab-active-background)';
+            e.currentTarget.style.color = 'var(--dv-tab-active-text-color)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = 'var(--dv-inactivegroup-visiblepanel-tab-color)';
+          }}
+          title="Close tab"
+        >
+          <XIcon size={12} />
+        </button>
+      </div>
     );
   },
   projectLibrary: (props: IDockviewPanelHeaderProps) => {

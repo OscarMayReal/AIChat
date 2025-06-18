@@ -42,29 +42,11 @@ export const models = [
         provider: "google",
         capabilities: []
     },
-    // OpenRouter Models
-    {
-        name: "openrouter/auto",
-        label: "OpenRouter Auto",
-        description: "Automatically select the best model available on OpenRouter.",
-        provider: "openrouter",
-        requiresApiKey: true,
-        capabilities: [
-            {
-                name: "apiKey",
-                description: "Your OpenRouter API key",
-                type: "password",
-                required: true,
-                friendlyName: "API Key",
-                icon: KeyIcon
-            }
-        ]
-    },
-    // OpenAI Models
+    // OpenAI Models (via OpenRouter)
     {
         name: "openrouter/openai/gpt-4o",
         label: "GPT-4o (via OpenRouter)",
-        description: "OpenAI's most advanced model, faster and 50% cheaper than GPT-4 Turbo.",
+        description: "OpenAI's most advanced model, faster and more capable than GPT-4 Turbo.",
         provider: "openrouter",
         requiresApiKey: true,
         capabilities: [
@@ -81,7 +63,7 @@ export const models = [
     {
         name: "openrouter/openai/gpt-4-turbo",
         label: "GPT-4 Turbo (via OpenRouter)",
-        description: "OpenAI's most capable model, optimized for chat with knowledge up to 2023.",
+        description: "OpenAI's powerful model with knowledge up to 2023.",
         provider: "openrouter",
         requiresApiKey: true,
         capabilities: [
@@ -95,11 +77,11 @@ export const models = [
             }
         ]
     },
-    // Anthropic Models
+    // Anthropic Models (via OpenRouter)
     {
         name: "openrouter/anthropic/claude-3-opus",
         label: "Claude 3 Opus (via OpenRouter)",
-        description: "Anthropic's most powerful model, excelling at highly complex tasks.",
+        description: "Anthropic's most capable model, excelling at complex reasoning.",
         provider: "openrouter",
         requiresApiKey: true,
         capabilities: [
@@ -130,11 +112,11 @@ export const models = [
             }
         ]
     },
-    // Google Models
+    // Mistral Models (via OpenRouter)
     {
-        name: "openrouter/google/gemini-pro",
-        label: "Gemini Pro (via OpenRouter)",
-        description: "Google's advanced model for complex tasks and reasoning.",
+        name: "openrouter/mistralai/mistral-large-latest",
+        label: "Mistral Large (via OpenRouter)",
+        description: "Mistral's most capable model, great for complex tasks.",
         provider: "openrouter",
         requiresApiKey: true,
         capabilities: [
@@ -148,11 +130,10 @@ export const models = [
             }
         ]
     },
-    // Open Source Models
     {
-        name: "openrouter/meta-llama/llama-3-70b-instruct",
-        label: "Llama 3 70B (via OpenRouter)",
-        description: "Meta's most capable open model, excellent for complex tasks.",
+        name: "openrouter/mistralai/mixtral-8x7b-instruct",
+        label: "Mixtral 8x7B (via OpenRouter)",
+        description: "High-quality mixture of experts model from Mistral AI.",
         provider: "openrouter",
         requiresApiKey: true,
         capabilities: [
@@ -166,10 +147,45 @@ export const models = [
             }
         ]
     },
+    // Free Models (via OpenRouter) - Still require API key for authentication
     {
         name: "openrouter/mistralai/mistral-7b-instruct",
         label: "Mistral 7B (via OpenRouter)",
-        description: "Efficient and capable open model from Mistral AI.",
+        description: "Efficient and capable open model from Mistral AI. Free to use but requires OpenRouter API key.",
+        provider: "openrouter",
+        requiresApiKey: true,
+        capabilities: [
+            {
+                name: "apiKey",
+                description: "Your OpenRouter API key",
+                type: "password",
+                required: true,
+                friendlyName: "API Key",
+                icon: KeyIcon
+            }
+        ]
+    },
+    {
+        name: "openrouter/huggingfaceh4/zephyr-7b-beta",
+        label: "Zephyr 7B Beta (via OpenRouter)",
+        description: "A fine-tuned version of Mistral-7B, optimized for chat. Free to use but requires OpenRouter API key.",
+        provider: "openrouter",
+        requiresApiKey: true,
+        capabilities: [
+            {
+                name: "apiKey",
+                description: "Your OpenRouter API key",
+                type: "password",
+                required: true,
+                friendlyName: "API Key",
+                icon: KeyIcon
+            }
+        ]
+    },
+    {
+        name: "deepseek/deepseek-r1:free",
+        label: "DeepSeek R1 (via OpenRouter)",
+        description: "DeepSeek's advanced model, optimized for coding and general tasks. Free to use but requires OpenRouter API key.",
         provider: "openrouter",
         requiresApiKey: true,
         capabilities: [

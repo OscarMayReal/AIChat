@@ -1,4 +1,4 @@
-import { HomeIcon, UsersIcon, LibraryIcon, BotIcon, PlusIcon, SparkleIcon, MessageSquareDashedIcon, MessageSquareIcon, MessageSquareLockIcon, Trash2Icon, ShareIcon, EditIcon, MoreVertical } from "lucide-react"
+import { HomeIcon, UsersIcon, LibraryIcon, BotIcon, PlusIcon, SparkleIcon, MessageSquareDashedIcon, MessageSquareIcon, MessageSquareLockIcon, Trash2Icon, ShareIcon, EditIcon, MoreVertical, ArchiveIcon } from "lucide-react"
 import { useMutation, useQuery } from "convex/react";
 import React, { useState, useEffect } from "react";
 import { Thread } from "@/app/generated/prisma";
@@ -34,6 +34,7 @@ interface SidebarThreadsViewProps {
 
 const sidebarThreadsView = ({ orgid, threads, setSidebarChatTitle, setThreads }: SidebarThreadsViewProps) => {
     const { showDialog, showConfirm } = useInputDialog();
+    var currentOrg = authClient.useActiveOrganization()
     return threads.map(thread => (
         <div key={thread.id} style={{ position: 'relative', width: '100%' }}>
             <SidebarItem 
@@ -68,7 +69,7 @@ const sidebarThreadsView = ({ orgid, threads, setSidebarChatTitle, setThreads }:
                     maxWidth: "100%",
                     minWidth: "100%",
                 }}>
-                    {thread.public ? (
+                    {thread.organizationPublic ? (
                         <MessageSquareIcon size={16} style={{ flexShrink: 0 }} />
                     ) : (
                         <MessageSquareLockIcon size={16} style={{ flexShrink: 0 }} />
@@ -238,10 +239,50 @@ const sidebarThreadsView = ({ orgid, threads, setSidebarChatTitle, setThreads }:
                                 <EditIcon className="mr-2 h-4 w-4" />
                                 <span>Rename</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <ShareIcon className="mr-2 h-4 w-4" />
-                                <span>Share</span>
-                            </DropdownMenuItem>
+                            {currentOrg.data !== null && (
+                                <DropdownMenuItem onClick={async () => {
+                                    const req = await fetch("/api/threads/" + thread.id, {
+                                        method: "PATCH",
+                                        headers: {
+                                            "Content-Type": "application/json",
+                                        },
+                                        body: JSON.stringify({ organizationPublic: !thread.organizationPublic, name: thread.name }),
+                                    });
+                                    if (!req.ok) {
+                                        await showConfirm({
+                                            title: "Error",
+                                            description: "Failed to toggle organization public. Please try again.",
+                                            confirmText: "OK"
+                                        });
+                                    } else {
+                                        setSidebarChatTitle({id: thread.id, name: thread.name});
+                                    }
+                                }}>
+                                    <ShareIcon className="mr-2 h-4 w-4" />
+                                    <span>Toggle Organization Public</span>
+                                </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={async () => {
+                                    const req = await fetch("/api/threads/" + thread.id, {
+                                        method: "PATCH",
+                                        headers: {
+                                            "Content-Type": "application/json",
+                                        },
+                                        body: JSON.stringify({ archived: !thread.archived, name: thread.name }),
+                                    });
+                                    if (!req.ok) {
+                                        await showConfirm({
+                                            title: "Error",
+                                            description: "Failed to toggle organization public. Please try again.",
+                                            confirmText: "OK"
+                                        });
+                                    } else {
+                                        setSidebarChatTitle({id: thread.id, name: thread.name});
+                                    }
+                                }}>
+                                    <ArchiveIcon className="mr-2 h-4 w-4" />
+                                    <span>Archive</span>
+                                </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>

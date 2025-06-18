@@ -209,12 +209,25 @@ export function RegularChat({
     const { messages, input, handleInputChange, handleSubmit } = useChat({
         api: '/api/chat',
         body: {
-            capabilities: enabledCapabilities,
+            capabilities: [
+                ...enabledCapabilities,
+                ...(model.capabilities || []).map(capability => ({
+                    name: capability.name,
+                    value: capability.value
+                }))
+            ],
             model: {
-                provider: model.provider,
-                name: model.name
+                ...model,
+                // Include the full model object with capabilities
+                capabilities: model.capabilities?.map(capability => ({
+                    name: capability.name,
+                    value: capability.value
+                })) || []
             },
             threadId: id,
+        },
+        headers: {
+            'Content-Type': 'application/json',
         },
         initialMessages: initialMessages.data.map(message => ({
             id: message.id,
@@ -920,8 +933,11 @@ export function LibraryPrompts({panelapi}: {panelapi: DockviewPanelApi}) {
                     flex: 1,
                 }}/>
                 <DropdownMenu>
-                    <DropdownMenuTrigger>
-                        <Button variant="outline"><PlusIcon size={16} />New Prompt</Button>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline">
+                            <PlusIcon size={16} className="mr-2" />
+                            New Prompt
+                        </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
                         <DropdownMenuLabel>New Prompt</DropdownMenuLabel>
@@ -1171,7 +1187,7 @@ var ChatListItem = ({thread, onClick}: {thread: Thread, onClick?: () => void}) =
                 }}>{new Date(thread.updatedAt).toDateString() + " at " + new Date(thread.updatedAt).toLocaleTimeString()}</div>
             </div>
             <div style={{flexGrow: 1}}></div>
-            <DropdownMenu>
+            {/* <DropdownMenu>
                 <DropdownMenuTrigger>
                     <MoreVerticalIcon size={18} />
                 </DropdownMenuTrigger>
@@ -1187,7 +1203,7 @@ var ChatListItem = ({thread, onClick}: {thread: Thread, onClick?: () => void}) =
                     <DropdownMenuItem>
                         <ArchiveIcon size={16} /> <div style={{color: "#666666"}}>Archive</div></DropdownMenuItem>
                 </DropdownMenuContent>
-            </DropdownMenu>
+            </DropdownMenu> */}
             <div style={{width: "1px"}}></div>
         </div>
     )
@@ -1582,15 +1598,41 @@ export function OrganizationThreadsPage() {
     );
 }
 
-export function ProjectPage({project: initialProject}: {project: Project}) {
-    const [project, setProject] = React.useState(initialProject);
+export function ProjectPage({project: initialProject, api}: {project: Project | null, api?: any}) {
+    const [project, setProject] = React.useState<Project | null>(initialProject);
     const [isRenaming, setIsRenaming] = React.useState(false);
-    const [newName, setNewName] = React.useState(initialProject.name);
+    const [newName, setNewName] = React.useState(initialProject?.name || '');
     const { showDialog } = useInputDialog();
+    
+    // Update local state if initialProject changes (e.g., from parent or tab parameters)
+    React.useEffect(() => {
+        if (initialProject) {
+            setProject(initialProject);
+            setNewName(initialProject.name);
+            
+            // Update tab title when initialProject changes
+            if (api) {
+                api.setTitle(initialProject.name);
+            }
+        }
+    }, [initialProject, api]);
+    
+    if (!project) {
+        return <div>Loading project...</div>;
+    }
     
     const threadsResult = useProjectThreads(project.id) as unknown as ProjectThreadsResult;
     const promptsResult = useProjectPrompts(project.id) as unknown as ProjectPromptsResult;
     const { showConfirm } = useInputDialog();
+    
+    // Update tab title when project name changes
+    React.useEffect(() => {
+        if (api && project?.name) {
+            api.setTitle(project.name);
+            // Update tab parameters to persist the new name
+            api.updateParameters({ project: { ...project, name: project.name } });
+        }
+    }, [project?.name, api]);
     
     // Create thread utilities
     const threads: ThreadWithDetails = {
@@ -1613,24 +1655,54 @@ export function ProjectPage({project: initialProject}: {project: Project}) {
     }
     
     const handleRename = async () => {
-        if (!newName.trim() || newName === project.name) {
+        if (!project) return;
+        
+        const trimmedName = newName.trim();
+        if (!trimmedName || trimmedName === project.name) {
+            setNewName(project.name);
             setIsRenaming(false);
             return;
         }
         
         try {
-            const response = await fetch(`/api/projects/${project.id}`, {
+            const response = await fetch(`/api/projects/${project.id}?id=${project.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newName })
+                body: JSON.stringify({ name: trimmedName })
             });
             
-            if (response.ok) {
-                const updatedProject = await response.json();
-                setProject(updatedProject);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to update project');
             }
+            
+            const updatedProject = await response.json();
+            
+            // Update local state
+            const updatedProjectWithId = { ...updatedProject, id: project.id };
+            setProject(updatedProjectWithId);
+            setNewName(trimmedName);
+            
+            // Update tab parameters to persist the new name
+            if (api) {
+                api.updateParameters({ project: updatedProjectWithId });
+            }
+            
+            // Dispatch event to update tab title and other components
+            window.dispatchEvent(new CustomEvent('project-updated', {
+                detail: {
+                    projectId: updatedProject.id,
+                    name: trimmedName
+                }
+            }));
+            
         } catch (error) {
             console.error('Error renaming project:', error);
+            // Reset to original name on error
+            setNewName(project.name);
+            // Show error to user
+            const errorMessage = error instanceof Error ? error.message : 'Failed to rename project';
+            alert(errorMessage);
         } finally {
             setIsRenaming(false);
         }
@@ -1638,22 +1710,33 @@ export function ProjectPage({project: initialProject}: {project: Project}) {
     
     const handleCreateThread = async () => {
         try {
-            const response = await fetch('/api/threads', {
+            const response = await fetch(`/api/threads?projectId=${project.id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    name: `New Thread ${new Date().toLocaleString()}`,
-                    projectId: project.id 
+                    name: `New Thread ${new Date().toLocaleString()}`
                 })
             });
             
             if (response.ok) {
                 const newThread = await response.json();
-                threads.openThread(newThread);
+                // Update the thread with the project ID if not included in the response
+                const threadWithProject = { ...newThread, projectId: project.id };
+                threads.openThread(threadWithProject);
+                // Refresh the threads list
                 threads.refresh();
+                
+                // Update the tab parameters to include the project
+                if (api) {
+                    api.updateParameters({ project });
+                }
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to create thread');
             }
         } catch (error) {
             console.error('Error creating thread:', error);
+            alert(error instanceof Error ? error.message : 'Failed to create thread');
         }
     };
     
@@ -1667,21 +1750,25 @@ export function ProjectPage({project: initialProject}: {project: Project}) {
             
             if (!promptName) return;
             
-            const response = await fetch('/api/prompts', {
+            const response = await fetch(`/api/prompts/project?projectId=${project.id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     name: promptName,
-                    content: '',
-                    projectId: project.id
+                    description: '',
+                    content: ''
                 })
             });
             
             if (response.ok) {
                 promptsResult.refresh();
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to create prompt');
             }
         } catch (error) {
             console.error('Error creating prompt:', error);
+            alert(error instanceof Error ? error.message : 'Failed to create prompt');
         }
     };
     
