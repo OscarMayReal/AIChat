@@ -11,7 +11,6 @@ export function AuthView({ pathname }: { pathname: string }) {
     if (pathname.includes("sign-in") || pathname.includes("sign-up")) {
         alignItems = "center";
         height = "100vh";
-        localStorage.removeItem("layouts");
     }
     
     return (
