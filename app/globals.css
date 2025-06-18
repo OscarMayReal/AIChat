@@ -54,6 +54,29 @@ body {
   --dv-separator-border: #e4e4e7 !important;
 }
 
+.ChatListItem {
+  transition: background-color 0.15s ease-in-out;
+  cursor: pointer;
+}
+
+.libraryFolderCard {
+  transition: background-color 0.15s ease-in-out;
+  cursor: pointer;
+  background-color: #fafafa;
+}
+
+.libraryFolderCard:hover {
+  background-color: #f3f3f3;
+}
+
+.ChatListItem:not(:last-child) {
+    border-bottom: 1px solid #e4e4e7;
+}
+
+.ChatListItem:hover {
+    background-color: #00000009;
+}
+
 .sidebarItem {
   display: flex;
   align-items: center;

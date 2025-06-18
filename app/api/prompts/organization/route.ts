@@ -1,46 +1,51 @@
-import { PrismaClient } from "@/app/generated/prisma";
 import { auth } from "@/auth";
 import { headers } from "next/headers";
-
+import { PrismaClient } from "@/app/generated/prisma";
 
 const prisma = new PrismaClient();
 
 export async function GET(request: Request) {
     const user = await auth.api.getSession({headers: await headers()})
-    if (!user) {
+    if (!user || !user.session.activeOrganizationId) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },
         });
     }
-    const threads = await prisma.thread.findMany({
+    const prompts = await prisma.prompt.findMany({
         where: {
             organizationId: user.session.activeOrganizationId,
-            ownerId: user.session.userId,
+            organizationPublic: true,
+            projectId: null,
         },
     })
-    return new Response(JSON.stringify(threads), {
+    return new Response(JSON.stringify(prompts), {
         headers: { "Content-Type": "application/json" },
     })
 }
 
 export async function POST(request: Request) {
     const user = await auth.api.getSession({headers: await headers()})
-    if (!user) {
+    if (!user || !user.session.activeOrganizationId) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },
         });
     }
-    const { name } = await request.json();
-    const thread = await prisma.thread.create({
+    const { name, description, content } = await request.json();
+    const prompt = await prisma.prompt.create({
         data: {
             name,
-            ownerId: user.session.userId,
+            description,
+            content,
+            ownerId: user.user.id,
             organizationId: user.session.activeOrganizationId,
+            lastEditedBy: user.user.id,
+            organizationPublic: true,
         },
     })
-    return new Response(JSON.stringify(thread), {
+    return new Response(JSON.stringify(prompt), {
         headers: { "Content-Type": "application/json" },
     })
 }
+

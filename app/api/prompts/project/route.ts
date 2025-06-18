@@ -1,11 +1,11 @@
-import { PrismaClient } from "@/app/generated/prisma";
 import { auth } from "@/auth";
 import { headers } from "next/headers";
-
+import { PrismaClient } from "@/app/generated/prisma";
+import { NextRequest } from "next/server";
 
 const prisma = new PrismaClient();
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
     const user = await auth.api.getSession({headers: await headers()})
     if (!user) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -13,18 +13,20 @@ export async function GET(request: Request) {
             headers: { "Content-Type": "application/json" },
         });
     }
-    const threads = await prisma.thread.findMany({
+    const projectId = request.nextUrl.searchParams.get("projectId");
+    const prompts = await prisma.prompt.findMany({
         where: {
+            ownerId: user.user.id,
             organizationId: user.session.activeOrganizationId,
-            ownerId: user.session.userId,
+            projectId: projectId,
         },
     })
-    return new Response(JSON.stringify(threads), {
+    return new Response(JSON.stringify(prompts), {
         headers: { "Content-Type": "application/json" },
     })
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     const user = await auth.api.getSession({headers: await headers()})
     if (!user) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -32,15 +34,20 @@ export async function POST(request: Request) {
             headers: { "Content-Type": "application/json" },
         });
     }
-    const { name } = await request.json();
-    const thread = await prisma.thread.create({
+    const { name, description, content } = await request.json();
+    const prompt = await prisma.prompt.create({
         data: {
             name,
-            ownerId: user.session.userId,
+            description,
+            content,
+            ownerId: user.user.id,
             organizationId: user.session.activeOrganizationId,
+            lastEditedBy: user.user.id,
+            projectId: request.nextUrl.searchParams.get("projectId")!,
         },
     })
-    return new Response(JSON.stringify(thread), {
+    return new Response(JSON.stringify(prompt), {
         headers: { "Content-Type": "application/json" },
     })
 }
+

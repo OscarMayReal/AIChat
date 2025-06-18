@@ -14,13 +14,22 @@ import {
   IDockviewPanelProps,
   IDockviewPanelHeaderProps,
 } from 'dockview';
-import { RegularChat, Watermark, LibraryPage } from '@/components/chatviews';
+import { RegularChat, Watermark, LibraryPage, MembersPage, LibraryPrompts, PromptEditor, ProjectLibrary, ProjectPage, ArchivedThreadsPage, OrganizationThreadsPage } from '@/components/chatviews';
 import { authClient } from '@/lib/auth-client';
 import { RedirectToSignIn, SignedIn, SignedOut } from '@daveyplate/better-auth-ui';
-import { LibraryIcon, MessageSquareIcon, XIcon } from 'lucide-react';
+import { ArchiveIcon, FolderOpenIcon, LibraryIcon, MessageSquareIcon, TextIcon, UsersIcon, XIcon } from 'lucide-react';
+import { Prompt } from './generated/prisma';
 
 type RegularChatProps = {
     id: string;
+}
+
+type PromptEditorProps = {
+    prompt: Prompt;
+}
+
+type ProjectPageProps = {
+    project: any;
 }
 
 const components = {
@@ -29,14 +38,111 @@ const components = {
             <RegularChat id={props.params.id} />
         )
     },
+    promptEditor: (props: IDockviewPanelProps<PromptEditorProps>) => {
+        return (
+            <PromptEditor prompt={props.params.prompt} />
+        )
+    },
+    projectPage: (props: IDockviewPanelProps<ProjectPageProps>) => {
+        return (
+            <ProjectPage project={props.params.project} />
+        )
+    },
     library: (props: IDockviewPanelProps) => {
         return (
             <LibraryPage />
+        )
+    },
+    members: (props: IDockviewPanelProps) => {
+        return (
+            <MembersPage />
+        )
+    },
+    libraryPrompts: (props: IDockviewPanelProps) => {
+        return (
+            <LibraryPrompts panelapi={props.api} />
+        )
+    },
+    projectLibrary: (props: IDockviewPanelProps) => {
+        return (
+            <ProjectLibrary />
+        )
+    },
+    archivedChats: (props: IDockviewPanelProps) => {
+        return (
+            <ArchivedThreadsPage />
+        )
+    },
+    organizationChats: (props: IDockviewPanelProps) => {
+        return (
+            <OrganizationThreadsPage />
         )
     }
 }
 
 const tabComponents = {
+  projectPage: (props: IDockviewPanelHeaderProps<ProjectPageProps>) => {
+    return (
+        <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            padding: '0 10px',
+        }}>
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: '#3f3f46',
+            }}>
+                <FolderOpenIcon size={14} />
+                <span>{props.params.project?.name || 'Project'}</span>
+            </div>
+            <div className="group">
+                <XIcon
+                    size={14}
+                    className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        props.api.close();
+                    }}
+                />
+            </div>
+        </div>
+    );
+  },
+  projectLibrary: (props: IDockviewPanelHeaderProps) => {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: '5px',
+        height: '100%',
+        width: '100%',
+        marginLeft: '5px',
+        marginRight: '5px',
+      }}>
+        <FolderOpenIcon size={16} />
+        <div>Projects</div>
+        <XIcon 
+          size={16} 
+          style={{
+            flexShrink: 0,
+            marginLeft: '5px',
+            cursor: 'pointer',
+          }} 
+          onClick={(e) => {
+            e.stopPropagation();
+            props.api.close();
+          }} 
+        />
+      </div>
+    );
+  },
   regularChat: (props: IDockviewPanelHeaderProps<RegularChatProps>) => {
     var [title, setTitle] = React.useState(props.api.title);
     props.api.onDidTitleChange(() => {
@@ -54,6 +160,34 @@ const tabComponents = {
           marginRight: "5px",
         }}>
           <MessageSquareIcon size={16} />
+          <div>{title}</div>
+          <XIcon size={16} style={{
+              flexShrink: 0,
+              marginLeft: "5px",
+              cursor: "pointer",
+          }} onClick={() => {
+              props.api.close();
+          }} />
+        </div>
+      );
+  },
+  promptEditor: (props: IDockviewPanelHeaderProps<PromptEditorProps>) => {
+    var [title, setTitle] = React.useState(props.api.title);
+    props.api.onDidTitleChange(() => {
+      setTitle(props.api.title);
+    });
+    return (
+        <div style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: "5px",
+          height: "100%",
+          width: "100%",
+          marginLeft: "5px",
+          marginRight: "5px",
+        }}>
+          <TextIcon size={16} />
           <div>{title}</div>
           <XIcon size={16} style={{
               flexShrink: 0,
@@ -87,6 +221,102 @@ const tabComponents = {
                 props.api.close();
             }} />
           </div>
+      );
+  },
+  members: (props: IDockviewPanelHeaderProps) => {
+    return (
+        <div style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: "5px",
+          height: "100%",
+          width: "100%",
+          marginLeft: "5px",
+          marginRight: "5px",
+        }}>
+          <UsersIcon size={16} />
+          <div>Members</div>
+          <XIcon size={16} style={{
+              flexShrink: 0,
+              marginLeft: "5px",
+              cursor: "pointer",
+          }} onClick={() => {
+              props.api.close();
+          }} />
+        </div>
+      );
+  },
+  libraryPrompts: (props: IDockviewPanelHeaderProps) => {
+    return (
+        <div style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: "5px",
+          height: "100%",
+          width: "100%",
+          marginLeft: "5px",
+          marginRight: "5px",
+        }}>
+          <LibraryIcon size={16} />
+          <div>Prompts</div>
+          <XIcon size={16} style={{
+              flexShrink: 0,
+              marginLeft: "5px",
+              cursor: "pointer",
+          }} onClick={() => {
+              props.api.close();
+          }} />
+        </div>
+      );
+  },
+  archivedChats: (props: IDockviewPanelHeaderProps) => {
+    return (
+        <div style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: "5px",
+          height: "100%",
+          width: "100%",
+          marginLeft: "5px",
+          marginRight: "5px",
+        }}>
+          <ArchiveIcon size={16} />
+          <div>Archived Chats</div>
+          <XIcon size={16} style={{
+              flexShrink: 0,
+              marginLeft: "5px",
+              cursor: "pointer",
+          }} onClick={() => {
+              props.api.close();
+          }} />
+        </div>
+      );
+  },
+  organizationChats: (props: IDockviewPanelHeaderProps) => {
+    return (
+        <div style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: "5px",
+          height: "100%",
+          width: "100%",
+          marginLeft: "5px",
+          marginRight: "5px",
+        }}>
+          <UsersIcon size={16} />
+          <div>Organization Chats</div>
+          <XIcon size={16} style={{
+              flexShrink: 0,
+              marginLeft: "5px",
+              cursor: "pointer",
+          }} onClick={() => {
+              props.api.close();
+          }} />
+        </div>
       );
   },
 };

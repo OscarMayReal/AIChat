@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation"
 import type { ReactNode } from "react"
 
 import { authClient } from "@/lib/auth-client"
+import { DialogProvider } from "@/components/ui/input-dialog"
 
 export function Providers({ children }: { children: ReactNode }) {
     const router = useRouter()
 
     return (
+      <DialogProvider>
         <AuthUIProvider
             authClient={authClient}
             navigate={router.push}
@@ -51,5 +53,6 @@ export function Providers({ children }: { children: ReactNode }) {
         >
             {children}
         </AuthUIProvider>
+      </DialogProvider>
     )
 }

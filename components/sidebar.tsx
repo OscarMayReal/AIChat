@@ -1,14 +1,16 @@
-import { HomeIcon, UsersIcon, LibraryIcon, BotIcon, PlusIcon, SparkleIcon, MessageSquareDashedIcon, MessageSquareIcon, MessageSquareLockIcon, Trash2Icon, ShareIcon, EditIcon, MoveIcon, FolderInputIcon } from "lucide-react"
+import { HomeIcon, UsersIcon, LibraryIcon, BotIcon, PlusIcon, SparkleIcon, MessageSquareDashedIcon, MessageSquareIcon, MessageSquareLockIcon, Trash2Icon, ShareIcon, EditIcon, MoreVertical } from "lucide-react"
 import { useMutation, useQuery } from "convex/react";
 import React, { useState, useEffect } from "react";
 import { Thread } from "@/app/generated/prisma";
-import {
-    ContextMenu,
-    ContextMenuContent,
-    ContextMenuItem,
-    ContextMenuTrigger,
-} from "@/components/ui/context-menu"
 import { authClient } from "@/lib/auth-client";
+import { deleteThread, renameThread } from "@/lib/threads";
+import { useInputDialog } from "./ui/input-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 var createThread = async (name: string): Promise<Thread> => {
     const response = await fetch("/api/threads", {
@@ -23,16 +25,22 @@ var createThread = async (name: string): Promise<Thread> => {
     return await response.json();
 }
 
-var sidebarThreadsView = ({orgid, threads, setSidebarChatTitle}: {orgid: string | undefined, threads: Thread[], setSidebarChatTitle: (title: {id: string, name: string}) => void}) => {
+interface SidebarThreadsViewProps {
+    orgid: string | undefined;
+    threads: Thread[];
+    setSidebarChatTitle: (title: {id: string, name: string}) => void;
+    setThreads: React.Dispatch<React.SetStateAction<{data: Thread[], loaded: boolean}>>;
+}
+
+const sidebarThreadsView = ({ orgid, threads, setSidebarChatTitle, setThreads }: SidebarThreadsViewProps) => {
+    const { showDialog, showConfirm } = useInputDialog();
     return threads.map(thread => (
-        <ContextMenu key={thread.id}>
-            <ContextMenuTrigger>
-                <SidebarItem onClick={() => {
-                    var found = false;
-                    (window as any).dockViewApi.panels.forEach((panel: any) => {
-                        console.log(panel.id, thread.id);
+        <div key={thread.id} style={{ position: 'relative', width: '100%' }}>
+            <SidebarItem 
+                onClick={() => {
+                    let found = false;
+                    (window as any).dockViewApi?.panels?.forEach?.((panel: any) => {
                         if (panel.id === thread.id) {
-                            console.log("Panel found");
                             panel.focus();
                             found = true;
                             return;
@@ -50,50 +58,195 @@ var sidebarThreadsView = ({orgid, threads, setSidebarChatTitle}: {orgid: string 
                             }
                         });
                     }
+                }}
+            >
+                <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    flexDirection: "row",
+                    maxWidth: "100%",
+                    minWidth: "100%",
                 }}>
+                    {thread.public ? (
+                        <MessageSquareIcon size={16} style={{ flexShrink: 0 }} />
+                    ) : (
+                        <MessageSquareLockIcon size={16} style={{ flexShrink: 0 }} />
+                    )}
                     <div style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        flexDirection: "row",
-                        maxWidth: "100%",
-                        minWidth: "100%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        maxWidth: "calc(100% - 60px)",
                     }}>
-                        {thread.public? (
-                            <MessageSquareIcon size={16} style={{
-                                flexShrink: 0,
-                            }} />
-                        ): (
-                            <MessageSquareLockIcon size={16} style={{
-                                flexShrink: 0,
-                            }} />
-                        )}
-                        <div style={{
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            maxWidth: "100%",
-                        }}>{thread.name}</div>
+                        {thread.name}
                     </div>
-                </SidebarItem>
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-                <ContextMenuItem style={{
-                    color: "rgb(198, 54, 54)",
-                }}><Trash2Icon style={{
-                    color: "rgb(198, 54, 54)",
-                }} size={16} />Delete</ContextMenuItem>
-                <ContextMenuItem style={{
-                    color: "#666666",
-                }}><ShareIcon size={16} />Share</ContextMenuItem>
-                <ContextMenuItem style={{
-                    color: "#666666",
-                }}><EditIcon size={16} />Rename</ContextMenuItem>
-                <ContextMenuItem style={{
-                    color: "#666666",
-                }}><FolderInputIcon size={16} />Move</ContextMenuItem>
-            </ContextMenuContent>
-        </ContextMenu>
+                    
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button 
+                                onClick={(e) => e.stopPropagation()}
+                                className="hover:bg-gray-100 dark:hover:bg-gray-800"
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#666',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    marginLeft: 'auto',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: '4px'
+                                }}
+                            >
+                                <MoreVertical size={16} />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" side="right">
+                            <DropdownMenuItem
+                                onClick={async (e) => {
+                                    e.preventDefault();
+                                    const result = await showConfirm({
+                                        title: "Delete Thread",
+                                        description: "Are you sure you want to delete this thread? This action cannot be undone.",
+                                        variant: 'destructive'
+                                    });
+                                    
+                                    if (!result) return;
+                                    
+                                    const { success, error } = await deleteThread(thread.id);
+                                    
+                                    if (success) {
+                                        // First, close the tab if it's open
+                                        if (typeof window !== 'undefined' && (window as any).dockViewApi) {
+                                            const dockView = (window as any).dockViewApi;
+                                            try {
+                                                // Close the panel if it exists
+                                                if (dockView.getPanel(thread.id)) {
+                                                    dockView.removePanel(thread.id);
+                                                    console.log(`Closed tab for thread ${thread.id}`);
+                                                }
+                                            } catch (error) {
+                                                console.error('Error closing thread tab:', error);
+                                                // Continue with deletion even if closing the tab fails
+                                            }
+                                        }
+                                        
+                                        try {
+                                            // First close the tab if it's open
+                                            if (typeof window !== 'undefined' && (window as any).dockViewApi) {
+                                                const dockView = (window as any).dockViewApi;
+                                                try {
+                                                    // Close the panel if it exists
+                                                    const panel = dockView.getPanel(thread.id);
+                                                    if (panel) {
+                                                        console.log(`Closing tab for thread ${thread.id}`);
+                                                        panel.api.close();
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Error closing thread tab:', error);
+                                                    // Continue with deletion even if closing the tab fails
+                                                }
+                                            }
+                                            
+                                            // Then update the UI state
+                                            setThreads(prev => ({
+                                                ...prev,
+                                                data: prev.data.filter(t => t.id !== thread.id)
+                                            }));
+                                            
+                                            // Clear the sidebar title if the deleted thread was selected
+                                            setSidebarChatTitle({ id: "", name: "" });
+                                            
+                                            // Refresh the threads list from the server to ensure consistency
+                                            try {
+                                                const response = await fetch("/api/threads");
+                                                const data = await response.json();
+                                                setThreads({ data, loaded: true });
+                                            } catch (refreshError) {
+                                                console.error("Failed to refresh threads after deletion:", refreshError);
+                                            }
+                                        } catch (error) {
+                                            console.error("Error during thread deletion:", error);
+                                            throw error; // Re-throw to trigger the error handling in the catch block below
+                                        }
+                                    } else {
+                                        await showConfirm({
+                                            title: "Error",
+                                            description: (() => {
+                                                try {
+                                                    return error && typeof error === 'object' && error !== null && 'message' in error
+                                                        ? String((error as { message: unknown }).message)
+                                                        : "Failed to delete the thread. Please try again.";
+                                                } catch {
+                                                    return "Failed to delete the thread. Please try again.";
+                                                }
+                                            })(),
+                                            confirmText: "OK",
+                                        });
+                                    }
+                                }}
+                                className="text-red-600 focus:bg-red-50"
+                            >
+                                <Trash2Icon className="mr-2 h-4 w-4" />
+                                <span>Delete</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={async (e) => {
+                                    e.preventDefault();
+                                    const newName = await showDialog({
+                                        title: "Rename Thread",
+                                        description: "Enter a new name for this thread:",
+                                        defaultValue: thread.name,
+                                    });
+                                    
+                                    if (!newName || newName.trim() === thread.name) return;
+                                    
+                                    console.log('Attempting to rename thread:', { id: thread.id, newName: newName.trim() });
+                                    const { success, error } = await renameThread(thread.id, newName.trim());
+                                    console.log('Rename result:', { success, error });
+                                    
+                                    if (success) {
+                                        setThreads(prev => ({
+                                            ...prev,
+                                            data: prev.data.map(t => 
+                                                t.id === thread.id 
+                                                    ? { ...t, name: newName.trim() } 
+                                                    : t
+                                            )
+                                        }));
+                                        
+                                        // Update the panel title if it's open
+                                        if ((window as any).dockViewApi) {
+                                            (window as any).dockViewApi.panels.forEach((panel: any) => {
+                                                if (panel.id === thread.id) {
+                                                    panel.setTitle(newName.trim());
+                                                }
+                                            });
+                                        }
+                                    } else {
+                                        await showConfirm({
+                                            title: "Error",
+                                            description: error || "Failed to rename the thread. Please try again.",
+                                            confirmText: "OK"
+                                        });
+                                    }
+                                }}
+                                className="hover:bg-gray-100"
+                            >
+                                <EditIcon className="mr-2 h-4 w-4" />
+                                <span>Rename</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                                <ShareIcon className="mr-2 h-4 w-4" />
+                                <span>Share</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </SidebarItem>
+        </div>
     ))
 }
 
@@ -133,6 +286,7 @@ export function Sidebar() {
             display: "flex",
             flexDirection: "column",
             gap: "8px",
+            overflowY: "scroll",
         }}>
             <SidebarItem style={{
                 backgroundColor: "#ffffff",
@@ -163,9 +317,16 @@ export function Sidebar() {
                 Agents
             </SidebarItem>
             {currentOrg.data !== null && (
-                <SidebarItem>
+                <SidebarItem onClick={() => {
+                    (window as any).dockViewApi.addPanel({
+                        component: "members",
+                        title: "Members",
+                        id: "members_id_" + new Date().toISOString(),
+                        tabComponent: "members",
+                    });
+                }}>
                     <UsersIcon size={16} />
-                    Users
+                    Members
                 </SidebarItem>
             )}
             <SidebarItem onClick={() => {
@@ -185,6 +346,7 @@ export function Sidebar() {
                 width: "100%",
                 marginTop: "5px",
                 backgroundColor: "#e4e4e7",
+                flexShrink: 0,
             }} />
             <div style={{
                 marginTop: "10px",
@@ -218,7 +380,12 @@ export function Sidebar() {
                     }}>Start a chat using the + button above</div>
                 </div>
             )}
-            {sidebarThreadsView({orgid: currentOrg.data?.id, threads: threads.data, setSidebarChatTitle})}
+            {sidebarThreadsView({
+                orgid: currentOrg.data?.id,
+                threads: threads.data,
+                setSidebarChatTitle,
+                setThreads
+            })}
         </div>
     )
 }

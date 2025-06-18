@@ -19,9 +19,12 @@ model Thread {
   organizationId String?
   messages       Message[]
   private        Boolean @default(false)
+  organizationPublic Boolean @default(false)
   updatedAt      DateTime @default(now())
   projectId      String?
   public         Boolean @default(false)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  archived       Boolean @default(false)
 
 
   @@index([ownerId])
@@ -36,4 +39,35 @@ model Message {
   createdAt DateTime @default(now())
   role      String
   senderId  String?
+  model String @default("gemini-2.0-flash")
+}
+
+model Prompt {
+    id String @id @default(cuid())
+    name String
+    description String
+    content String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
+    lastUsed DateTime @default(now())
+    ownerId String
+    organizationId String?
+    lastEditedBy String
+    projectId String?
+    organizationPublic Boolean @default(false)
+    project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+    id String @id @default(cuid())
+    name String
+    ownerId String
+    organizationId String?
+    parentId String?
+    prompts Prompt[]
+    description String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
+    organizationPublic Boolean @default(false)
+    threads Thread[]
 }
