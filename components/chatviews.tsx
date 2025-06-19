@@ -23,7 +23,13 @@ import {
   Loader2 as Loader2Icon, 
   Pencil as PencilIcon, 
   X as XIcon,
-  Plus as PlusIcon
+  Plus as PlusIcon,
+  MessageSquareMore,
+  MessageSquareMoreIcon,
+  MessageSquare,
+  MessageSquareOffIcon,
+  ArchiveRestoreIcon,
+  ChevronLeftIcon
 } from "lucide-react";
 import { Thread as ThreadType } from "@/app/generated/prisma";
 import { Button } from "@/components/ui/button";
@@ -51,7 +57,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Toggle } from "@/components/ui/toggle";
 import { models, model, capability } from "@/lib/models";
 import { ModelSelector } from "@/components/combobox";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Thread, Message, Prompt } from "@/app/generated/prisma";
 import { DockviewPanel, DockviewPanelApi } from "dockview-react";
 import Markdown from 'react-markdown'
@@ -65,8 +71,8 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { authClient } from "@/lib/auth-client";
-import { OrganizationMembersCard } from "@daveyplate/better-auth-ui";
-import { openArchivedChats, openOrganizationChats, openThread, useArchivedThreads, useOrganizationThreads, useProjectThreads, useThreads } from "@/lib/threads";
+import { OrganizationMembersCard, OrganizationInvitationsCard } from "@daveyplate/better-auth-ui";
+import { archiveThread, createProjectThread, deleteThread, moveThreadToOrganization, openArchivedChats, openOrganizationChats, openThread, renameThread, useArchivedThreads, useOrganizationThreads, useProjectThreads, useThreads } from "@/lib/threads";
 import {
     Tooltip,
     TooltipContent,
@@ -99,6 +105,8 @@ type EmptyChatPlaceholderProps = {
 };
 
 export function EmptyChatPlaceholder({ onPromptSelect }: EmptyChatPlaceholderProps) {
+    var session = authClient.useSession()
+    const {showDialog} = useInputDialog();
     var personalPrompts = usePersonalPrompts()
     return (
         <div style={{
@@ -116,7 +124,7 @@ export function EmptyChatPlaceholder({ onPromptSelect }: EmptyChatPlaceholderPro
                 fontSize: "30px",
                 fontWeight: "500",
                 marginBottom: "10px",
-            }}>Hello, How can I help you today?</div>
+            }}>Hello <span style={{ color: "rgb(150, 62, 255)" }}>{session.data?.user?.name}</span>, How can I help you today?</div>
             <div style={{
                 fontSize: "15px",
                 marginBottom: "25px",
@@ -128,6 +136,7 @@ export function EmptyChatPlaceholder({ onPromptSelect }: EmptyChatPlaceholderPro
             {personalPrompts.data.length > 0 && (
                 <div style={{
                     display: "grid",
+                    justifyItems: "center",
                     gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
                     gap: "15px",
                     width: "100%",
@@ -135,9 +144,12 @@ export function EmptyChatPlaceholder({ onPromptSelect }: EmptyChatPlaceholderPro
                     margin: "0 auto",
                 }}>
                     {personalPrompts.data.map((prompt: Prompt, index: number) => (
-                        index > 4 ? null : (
+                        index > 6 ? null : (
                         <div 
-                            onClick={() => onPromptSelect?.(prompt.content)}
+                            onClick={async () => {
+                                prompt.content = await replaceVariablesAsync(prompt.content, showDialog);
+                                onPromptSelect?.(prompt.content);
+                            }}
                             style={{ width: '100%' }}
                             key={prompt.id}
                         >
@@ -146,7 +158,10 @@ export function EmptyChatPlaceholder({ onPromptSelect }: EmptyChatPlaceholderPro
                                 color="#983DEF" 
                                 icon={<TextIcon size={16} />} 
                                 subtitle={prompt.description || prompt.content.substring(0, 100) + (prompt.content.length > 100 ? '...' : '')}
-                                onClick={() => onPromptSelect?.(prompt.content)}
+                                onClick={async () => {
+                                    prompt.content = await replaceVariablesAsync(prompt.content, showDialog);
+                                    onPromptSelect?.(prompt.content);
+                                }}
                             />
                         </div>
                         )
@@ -170,6 +185,10 @@ export function MembersPage() {
                 marginBottom: "25px",
             }}>Organization Members</div>
             <OrganizationMembersCard title=" " />
+            <div style={{
+                height: "25px",
+            }}></div>
+            <OrganizationInvitationsCard title=" " />
         </div>
     )
 }
@@ -179,6 +198,15 @@ export function RegularChat({
 }: {
     id: string;
 }) {
+    const scrollableDivRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (scrollableDivRef.current) {
+            scrollableDivRef.current.scrollTop = scrollableDivRef.current.scrollHeight;
+        }
+    }, [])
+    var thispanelholder = (window as any).dockViewApi?.panels?.find?.((panel: any) => panel.id === id);
+    var thispanel = thispanelholder as DockviewPanel;
     var [model, setModel] = useState<model>(models[0]);
     var [enabledCapabilities, setEnabledCapabilities] = useState<capability[]>([]);
     var [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -254,6 +282,12 @@ export function RegularChat({
                         threadId: id,
                     });
                 }
+                setTimeout(() => {
+                    scrollableDivRef.current?.scrollTo({
+                        top: scrollableDivRef.current.scrollHeight + 250,
+                        behavior: 'smooth',
+                    });
+                }, 200);
             } catch (error) {
                 console.error('Failed to save message:', error);
             }
@@ -273,6 +307,12 @@ export function RegularChat({
             });
             // Then trigger the chat submission
             await handleSubmit(e);
+            setTimeout(() => {
+                scrollableDivRef.current?.scrollTo({
+                    top: scrollableDivRef.current.scrollHeight + 250,
+                    behavior: 'smooth',
+                });
+            }, 200);
         } catch (error) {
             console.error('Error sending message:', error);
         }
@@ -337,7 +377,7 @@ export function RegularChat({
                 flexDirection: "column",
                 gap: "15px",
                 overflowY: "auto",
-            }}>
+            }} ref={scrollableDivRef}>
                 {messages.length === 0 ? (
                     <EmptyChatPlaceholder 
                         onPromptSelect={(text) => {
@@ -357,7 +397,7 @@ export function RegularChat({
                         className="whitespace-pre-wrap" 
                         style={{
                             textAlign: message.role === 'user' ? 'right' : 'left' as const,
-                            backgroundColor: message.role === 'user' ? '#f0f9ff' : '#f8fafc',
+                            backgroundColor: message.role === 'user' ? 'rgb(243, 233, 255)' : 'rgb(249, 244, 255)',
                             padding: '12px 16px',
                             borderRadius: '8px',
                             maxWidth: '80%',
@@ -371,7 +411,7 @@ export function RegularChat({
                             overflowWrap: 'break-word',
                         }}
                     >
-                        <div style={{ fontWeight: 500, marginBottom: '4px' }}>
+                        <div style={{ fontWeight: 500, marginBottom: '4px', color: 'rgb(152, 61, 255)' }}>
                             {message.role === 'user' ? 'You' : 'AI'}
                         </div>
                         <Markdown remarkPlugins={[remarkGfm]}>{message.content}</Markdown>
@@ -402,10 +442,53 @@ export function RegularChat({
                     setModel={setModel}
                     setEnabledCapabilities={setEnabledCapabilities}
                     currentProject={currentProject}
+                    thispanel={thispanel}
                 />
             </div>
         </>
     )
+}
+
+async function replaceVariablesAsync(inputString: string, showDialog: (options: { title: string; description: string }) => Promise<string | null>): Promise<string> {
+    const regex = /\${([^}]+)}/g; // Matches ${something}, captures "something"
+    let resultString = "";
+    let lastIndex = 0;
+    let match;
+  
+    while ((match = regex.exec(inputString)) !== null) {
+      // Append the text before the match
+      resultString += inputString.substring(lastIndex, match.index);
+  
+      // Extract the variable name (the "something" inside ${something})
+      const variableName = match[1];
+  
+      // Use the async showDialog function to get replacement text
+      const dialogOptions = {
+        title: `Replace ${variableName}`,
+        description: `Enter replacement for ${variableName}:`,
+      };
+      const replacementText = await showDialog(dialogOptions);
+  
+      // Check if the user cancelled the dialog (returned null)
+      if (replacementText === null) {
+        // Handle cancellation (e.g., replace with an empty string, throw an error, etc.)
+        console.warn(`Replacement cancelled for ${variableName}.  Using empty string.`);
+        resultString += ""; // Replace with empty string
+        // Or: throw new Error(`Replacement cancelled for ${variableName}`);
+        // Or: return null; // Indicate failure
+      } else {
+        // Append the replacement text
+        resultString += replacementText;
+      }
+  
+      // Update the last index to the end of the match
+      lastIndex = match.index + match[0].length;
+    }
+  
+    // Append any remaining text after the last match
+    resultString += inputString.substring(lastIndex);
+  
+    return resultString;
 }
 
 export function ChatBar({
@@ -417,6 +500,7 @@ export function ChatBar({
     setModel,
     setEnabledCapabilities,
     currentProject,
+    thispanel,
 }: {
     input: string;
     handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement> | string) => void;
@@ -426,8 +510,11 @@ export function ChatBar({
     setModel: (model: model) => void;
     setEnabledCapabilities: (enabledCapabilities: capability[]) => void;
     currentProject: Project | null;
+    thispanel: DockviewPanel;
 }) {
+    const {showDialog} = useInputDialog();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    var textAreaRef = useRef<HTMLTextAreaElement>(null);
     
     const handleFormSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -443,6 +530,15 @@ export function ChatBar({
         }
     };
     return (
+        thispanel.api.onDidActiveChange(() => {
+            console.log("Active changed");
+            if (thispanel.api.isActive) {
+                console.log("Active");
+                setTimeout(() => {
+                    textAreaRef.current?.focus();
+                }, 100);
+            }
+        }),
         <form onSubmit={handleFormSubmit} style={{
             boxShadow: "rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
             padding: "5px",
@@ -462,6 +558,7 @@ export function ChatBar({
         }}>
             <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <textarea
+                    ref={textAreaRef}
                     value={input}
                     onChange={handleInputChange}
                     style={{
@@ -494,12 +591,16 @@ export function ChatBar({
                     padding: '0 5px 5px',
                 }}>
                     <PromptSelector 
-                        setInput={(value) => {
-                            handleInputChange(value);
+                        setInput={async(value) => {
+                            const newValue = await replaceVariablesAsync(value, async (options) => {
+                                const result = await showDialog(options);
+                                return result;
+                            });
+                            handleInputChange(newValue);
                             const textarea = document.querySelector('textarea');
                             if (textarea) {
                                 textarea.focus();
-                                const length = value.length;
+                                const length = newValue.length;
                                 textarea.setSelectionRange(length, length);
                             }
                         }} 
@@ -567,6 +668,18 @@ export function CapabilitySelector({
         return apiKeyCap?.value ? true : false;
     }, [value]);
     
+    var savedkey = localStorage.getItem('openrouter-apiKey');
+    console.log('Saved API key:', savedkey);
+    if (savedkey != undefined && !isApiKeySet) {
+        console.log('API key not set, setting it now');
+        // Find the API key capability
+        const apiKeyCapability = capabilities.find(c => c.name === 'apiKey');
+        if (apiKeyCapability) {
+            const updatedCapability = { ...apiKeyCapability, value: savedkey };
+            setValue([...value.filter(c => c.name !== 'apiKey'), updatedCapability]);
+        }
+    }
+
     const handleApiKeyClick = async () => {
         console.log('API key button clicked');
         try {
@@ -586,6 +699,7 @@ export function CapabilitySelector({
                 if (apiKeyCapability) {
                     const updatedCapability = { ...apiKeyCapability, value: apiKey };
                     setValue([...value.filter(c => c.name !== 'apiKey'), updatedCapability]);
+                    localStorage.setItem('openrouter-apiKey', apiKey);
                 }
             }
         } catch (error) {
@@ -595,11 +709,23 @@ export function CapabilitySelector({
 
     const handleCapabilityToggle = (capability: capability, newState: boolean) => {
         console.log('Capability toggled:', capability.name, 'New state:', newState);
-        setValue(
-            newState 
-                ? [...value.filter(c => c.name !== capability.name), capability]
-                : value.filter((c) => c !== capability)
-        );
+        
+        if (newState) {
+            // If toggling on, add/update the capability with value: true
+            const updatedCapability = { 
+                ...capability, 
+                value: true
+            };
+            setValue([
+                ...value.filter(c => c.name !== capability.name),
+                updatedCapability
+            ]);
+        } else {
+            // If toggling off, remove the capability entirely
+            setValue(value.filter(c => c.name !== capability.name));
+        }
+        
+        console.log('Updated capabilities:', value);
     };
 
     return (
@@ -607,14 +733,12 @@ export function CapabilitySelector({
             {/* API Key Button - Always show for OpenRouter models */}
             {capabilities.some(c => c.name === 'apiKey') && (
                 <Button 
-                    variant={isApiKeySet ? 'default' : 'outline'} 
-                    size="sm" 
+                    variant={isApiKeySet ? 'default' : 'outline'}  
                     onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         handleApiKeyClick();
                     }}
-                    className="text-xs gap-2"
                 >
                     <KeyIcon size={14} />
                     {isApiKeySet ? 'API Key Set' : 'Set API Key'}
@@ -622,43 +746,33 @@ export function CapabilitySelector({
                 </Button>
             )}
             
-            {capabilities
-                .filter(capability => capability.name !== 'apiKey')
-                .map((capability) => {
+            {capabilities.map((capability) => {
+                if (capability.name === 'apiKey') {
+                    return null;
+                }
                 const isActive = value.some(c => c.name === capability.name);
-
                 return (
                     <Tooltip key={capability.name}>
                         <TooltipTrigger asChild>
                             <div>
                                 <div className="relative">
                                     <Toggle
-                                        type="button"
-                                        variant={isActive ? "default" : "outline"}
+                                        variant="outline"
                                         onPressedChange={(on) => handleCapabilityToggle(capability, on)}
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                        }}
                                         pressed={isActive}
-                                        className={`gap-2 ${capability.name === 'apiKey' && isApiKeySet ? 'pr-8' : ''}`}
+                                        style={{
+                                            backgroundColor: isActive ? 'rgb(152, 61, 255)' : 'transparent',
+                                            color: isActive ? '#ffffff' : '#666666',
+                                        }}
                                     >
                                         <capability.icon size={15} />
                                         {capability.friendlyName}
                                     </Toggle>
-                                    {capability.name === 'apiKey' && isApiKeySet && (
-                                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
-                                            <CheckIcon size={16} />
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         </TooltipTrigger>
                         <TooltipContent>
                             <p>{capability.description}</p>
-                            {capability.name === 'apiKey' && isActive && value.find(c => c.name === 'apiKey')?.value && (
-                                <p className="text-xs mt-1 text-green-500">API key is set</p>
-                            )}
                         </TooltipContent>
                     </Tooltip>
                 );
@@ -670,7 +784,10 @@ export function CapabilitySelector({
 export function PromptSelector({setInput, currentProject}: {setInput: (input: string) => void, currentProject: Project | null}) {
     const organizationPrompts = useOrganizationPrompts();
     const personalPrompts = usePersonalPrompts();
+    var projects = useProjects();
     const [open, setOpen] = useState(false);
+    const [currentProjectOpen, setCurrentProjectOpen] = useState<Project | null>(currentProject);
+    const projectPrompts = useProjectPrompts(currentProjectOpen?.id ?? null);
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -818,7 +935,100 @@ export function PromptSelector({setInput, currentProject}: {setInput: (input: st
                         )}
                     </TabsContent>
                     <TabsContent value="Project">
-                        Project
+                        {currentProjectOpen ? (
+                            <>
+                                <div style={{
+                                    display: "flex",
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    gap: "10px",
+                                    marginTop: "15px",
+                                    cursor: "pointer",
+                                }}>
+                                    <ChevronLeftIcon size={20} color="#666666" onClick={() => setCurrentProjectOpen(null)} />
+                                    <div>
+                                        <div style={{
+                                            fontSize: "16px",
+                                            fontWeight: "500",
+                                        }}>{currentProjectOpen.name}</div>
+                                    </div>
+                                </div>
+                                {projectPrompts.data.map((prompt) => (
+                                    <div key={prompt.id} onClick={() => {
+                                        setInput(prompt.content);
+                                        setCurrentProjectOpen(null);
+                                        setOpen(false);
+                                    }} style={{
+                                        display: "flex",
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                        gap: "10px",
+                                        marginTop: "15px",
+                                        cursor: "pointer",
+                                    }}>
+                                        <div style={{
+                                            width: "40px",
+                                            height: "40px",
+                                            borderRadius: "5px",
+                                            backgroundColor: "#983DFF",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                        }}>
+                                            <TextIcon size={20} color="#fff"/>
+                                        </div>
+                                        <div>
+                                            <div style={{
+                                                fontSize: "16px",
+                                                fontWeight: "500",
+                                            }}>{prompt.name}</div>
+                                            <div style={{
+                                                fontSize: "12px",
+                                                color: "#999",
+                                                fontWeight: "400",
+                                            }}>{prompt.description}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </>
+                        ) : (
+                            projects.data.map((project) => (
+                                <div key={project.id} onClick={() => {
+                                    setCurrentProjectOpen(project);
+                                    
+                                }} style={{
+                                    display: "flex",
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    gap: "10px",
+                                    marginTop: "15px",
+                                    cursor: "pointer",
+                                }}>
+                                    <div style={{
+                                        width: "40px",
+                                        height: "40px",
+                                        borderRadius: "5px",
+                                        backgroundColor: "#983DFF",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                    }}>
+                                        <TextIcon size={20} color="#fff"/>
+                                    </div>
+                                    <div>
+                                        <div style={{
+                                            fontSize: "16px",
+                                            fontWeight: "500",
+                                        }}>{project.name}</div>
+                                        <div style={{
+                                            fontSize: "12px",
+                                            color: "#999",
+                                            fontWeight: "400",
+                                        }}>{project.description}</div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </TabsContent>
                 </Tabs>
             </DialogContent>
@@ -896,8 +1106,8 @@ export function LibraryPage() {
                 border: "1px solid #e4e4e7",
                 backgroundColor: "#fafafa",
             }}>
-                {threads.data?.map(thread => (
-                    <ChatListItem key={thread.id} thread={thread} onClick={() => openThread(thread)} />
+                {threads.data?.filter(thread => !thread.archived && !thread.projectId && !thread.organizationPublic).map(thread => (
+                    <ChatListItem key={thread.id} thread={thread} onClick={() => openThread(thread)} reload={() => threads.refresh()} />
                 ))}
             </div>
         </div>
@@ -905,6 +1115,7 @@ export function LibraryPage() {
 }
 
 export function LibraryPrompts({panelapi}: {panelapi: DockviewPanelApi}) {
+    var [currentProject, setCurrentProject] = useState<string | null>(null);
     const { showDialog } = useInputDialog();
     var personalPrompts = usePersonalPrompts();
     var organizationPrompts = useOrganizationPrompts();
@@ -1149,7 +1360,10 @@ function LibraryFolderCard({title, onClick, subtitle, icon, color}: {title: stri
     )
 }
 
-var ChatListItem = ({thread, onClick}: {thread: Thread, onClick?: () => void}) => {
+var ChatListItem = ({thread, onClick, reload}: {thread: Thread, onClick?: () => void, reload?: () => void}) => {
+    var { showDialog, showConfirm } = useInputDialog();
+    var currentOrg = authClient.useActiveOrganization()
+    var session = authClient.useSession()
     return (
         <div style={{
             padding: "10px",
@@ -1171,9 +1385,9 @@ var ChatListItem = ({thread, onClick}: {thread: Thread, onClick?: () => void}) =
                 backgroundColor: "#983DFF",
             }}>
                 {thread.public? (
-                    <MessageSquareIcon size={20} />
+                    <ShareIcon size={20} />
                 ): (
-                    <MessageSquareLockIcon size={20} />
+                    <MessageSquare size={20} />
                 )}
             </div>
             <div style={{
@@ -1184,26 +1398,77 @@ var ChatListItem = ({thread, onClick}: {thread: Thread, onClick?: () => void}) =
                     fontSize: "12px",
                     color: "#999",
                     fontWeight: "400",
-                }}>{new Date(thread.updatedAt).toDateString() + " at " + new Date(thread.updatedAt).toLocaleTimeString()}</div>
+                }}>{new Date(thread.updatedAt).toDateString() + " at " + new Date(thread.updatedAt).toLocaleTimeString()} {(thread.organizationPublic && currentOrg?.data != null ? ". Created by " + currentOrg.data.members.find((member: any) => member.user.id === thread.ownerId)?.user.name : "")}</div>
             </div>
             <div style={{flexGrow: 1}}></div>
-            {/* <DropdownMenu>
-                <DropdownMenuTrigger>
-                    <MoreVerticalIcon size={18} />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenuItem>
-                        <Trash2Icon size={16} style={{color: "rgb(198, 54, 54)"}} /> <div style={{color: "rgb(198, 54, 54)"}}>Delete</div></DropdownMenuItem>
-                    <DropdownMenuItem>
-                        <ShareIcon size={16} /> <div style={{color: "#666666"}}>Share</div></DropdownMenuItem>
-                    <DropdownMenuItem>
-                        <PenBoxIcon size={16} /> <div style={{color: "#666666"}}>Rename</div></DropdownMenuItem>
-                    <DropdownMenuItem>
-                        <FolderInputIcon size={16} /> <div style={{color: "#666666"}}>Move</div></DropdownMenuItem>
-                    <DropdownMenuItem>
-                        <ArchiveIcon size={16} /> <div style={{color: "#666666"}}>Archive</div></DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu> */}
+            {session.data?.user.id === thread.ownerId && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger>
+                        <MoreVerticalIcon size={18} />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenuItem onClick={() => {
+                            showConfirm({
+                                title: "Delete Thread",
+                                description: "Are you sure you want to delete this thread?",
+                                confirmText: "Delete",
+                                cancelText: "Cancel",
+                            }).then(async (confirmed) => {
+                                if (confirmed) {
+                                    await deleteThread(thread.id);
+                                    if (reload) {
+                                        reload();
+                                    }
+                                }
+                            });
+                        }}>
+                            <Trash2Icon size={16} style={{color: "rgb(198, 54, 54)"}} /> <div style={{color: "rgb(198, 54, 54)"}}>Delete</div></DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                            showDialog({
+                                title: "Rename Thread",
+                                label: "New Name",
+                                defaultValue: thread.name,
+                                confirmText: "Rename",
+                                cancelText: "Cancel",
+                            }).then(async (name) => {
+                                console.log(name);
+                                if (name) {
+                                    await renameThread(thread.id, name);
+                                    if (reload) {
+                                        reload();
+                                    }
+                                }
+                            });
+                        }}>
+                            <PenBoxIcon size={16} /> <div style={{color: "#666666"}}>Rename</div></DropdownMenuItem>
+                            {thread.organizationId && (
+                                <DropdownMenuItem onClick={async () => {
+                                    await moveThreadToOrganization(thread);
+                                    if (reload) {
+                                        reload();
+                                    }
+                                }}>
+                                    <FolderInputIcon size={16} /> <div style={{color: "#666666"}}>Move to organization</div></DropdownMenuItem>
+                            )}
+                        <DropdownMenuItem onClick={async () => {
+                            await archiveThread(thread);
+                            if (reload) {
+                                reload();
+                            }
+                        }}>
+                            {thread.archived? (
+                                <>
+                                    <ArchiveRestoreIcon size={16} /> <div style={{color: "#666666"}}>Unarchive</div>
+                                </>
+                            ): (
+                                <>
+                                    <ArchiveIcon size={16} /> <div style={{color: "#666666"}}>Archive</div>
+                                </>
+                            )}
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )}
             <div style={{width: "1px"}}></div>
         </div>
     )
@@ -1394,11 +1659,12 @@ export function ProjectLibrary() {
                     color: "#666",
                     border: "1px dashed #e4e4e7",
                     borderRadius: "8px",
-                    backgroundColor: "#fafafa"
+                    backgroundColor: "#fafafa",
+                    justifyContent: "center",
                 }}>
-                    <FolderOpenIcon size={32} style={{ marginBottom: "12px", opacity: 0.6 }} />
-                    <div style={{ fontWeight: 500, marginBottom: "4px" }}>No projects yet</div>
-                    <div style={{ fontSize: "14px" }}>Create your first project to get started</div>
+                    <FolderOpenIcon size={32} style={{ marginBottom: "12px", opacity: 0.6, margin: "12px auto"}} />
+                    <div style={{ fontWeight: 500, marginBottom: "4px", margin: "4px auto" }}>No projects yet</div>
+                    <div style={{ fontSize: "14px", margin: "0 auto" }}>Create your first project to get started</div>
                 </div>
             ) : (
                 <div style={{
@@ -1532,7 +1798,7 @@ export function ArchivedThreadsPage() {
             }}>
                 {threads.data?.length > 0 ? (
                     threads.data.map(thread => (
-                        <ChatListItem key={thread.id} thread={thread} onClick={() => openThread(thread)} />
+                        <ChatListItem key={thread.id} thread={thread} onClick={() => openThread(thread)} reload={() => threads.refresh()}/>
                     ))
                 ) : (
                     <EmptyState
@@ -1584,7 +1850,7 @@ export function OrganizationThreadsPage() {
             }}>
                 {threads.data?.length > 0 ? (
                     threads.data.map(thread => (
-                        <ChatListItem key={thread.id} thread={thread} onClick={() => openThread(thread)} />
+                        <ChatListItem key={thread.id} thread={thread} onClick={() => openThread(thread)} reload={() => threads.refresh()}/>
                     ))
                 ) : (
                     <EmptyState
@@ -1635,16 +1901,7 @@ export function ProjectPage({project: initialProject, api}: {project: Project | 
     }, [project?.name, api]);
     
     // Create thread utilities
-    const threads: ThreadWithDetails = {
-        ...threadsResult,
-        openThread: (thread: ThreadType) => {
-            window.dispatchEvent(new CustomEvent('open-thread', { detail: { threadId: thread.id } }));
-        },
-        refresh: () => {
-            const event = new CustomEvent('refresh-threads');
-            window.dispatchEvent(event);
-        }
-    };
+    const threads = threadsResult;
     
     // Ensure prompts has refresh method
     if (!promptsResult.refresh) {
@@ -1710,30 +1967,11 @@ export function ProjectPage({project: initialProject, api}: {project: Project | 
     
     const handleCreateThread = async () => {
         try {
-            const response = await fetch(`/api/threads?projectId=${project.id}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    name: `New Thread ${new Date().toLocaleString()}`
-                })
-            });
-            
-            if (response.ok) {
-                const newThread = await response.json();
-                // Update the thread with the project ID if not included in the response
-                const threadWithProject = { ...newThread, projectId: project.id };
-                threads.openThread(threadWithProject);
-                // Refresh the threads list
+            var thread = await createProjectThread(`New Chat`, project!);
+            setTimeout(() => {
                 threads.refresh();
-                
-                // Update the tab parameters to include the project
-                if (api) {
-                    api.updateParameters({ project });
-                }
-            } else {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || 'Failed to create thread');
-            }
+                openThread(thread);
+            }, 100);
         } catch (error) {
             console.error('Error creating thread:', error);
             alert(error instanceof Error ? error.message : 'Failed to create thread');
@@ -1781,109 +2019,122 @@ export function ProjectPage({project: initialProject, api}: {project: Project | 
             backgroundColor: "#fff",
         }}>
             <div style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
                 padding: "16px 24px",
                 borderBottom: "1px solid #e4e4e7",
                 backgroundColor: "#ffffff",
                 boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
             }}>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginBottom: '4px',
-                }}>
-                    {isRenaming ? (
-                        <input
-                            type="text"
-                            value={newName}
-                            onChange={(e) => setNewName(e.target.value)}
-                            onBlur={handleRename}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleRename();
-                                if (e.key === 'Escape') {
+                <div>
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '4px',
+                    }}>
+                        {isRenaming ? (
+                            <input
+                                type="text"
+                                value={newName}
+                                onChange={(e) => setNewName(e.target.value)}
+                                onBlur={handleRename}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleRename();
+                                    if (e.key === 'Escape') {
+                                        setNewName(project.name);
+                                        setIsRenaming(false);
+                                    }
+                                }}
+                                autoFocus
+                                style={{
+                                    fontSize: '20px',
+                                    fontWeight: 600,
+                                    color: '#18181b',
+                                    border: '1px solid #e4e4e7',
+                                    borderRadius: '4px',
+                                    padding: '4px 8px',
+                                    width: '100%',
+                                    maxWidth: '400px',
+                                }}
+                            />
+                        ) : (
+                            <h1 
+                                style={{
+                                    fontSize: "20px",
+                                    fontWeight: 600,
+                                    color: "#18181b",
+                                    margin: 0,
+                                    cursor: 'pointer',
+                                }}
+                                onClick={() => {
                                     setNewName(project.name);
-                                    setIsRenaming(false);
-                                }
-                            }}
-                            autoFocus
-                            style={{
-                                fontSize: '20px',
-                                fontWeight: 600,
-                                color: '#18181b',
-                                border: '1px solid #e4e4e7',
-                                borderRadius: '4px',
-                                padding: '4px 8px',
-                                width: '100%',
-                                maxWidth: '400px',
-                            }}
-                        />
-                    ) : (
-                        <h1 
-                            style={{
-                                fontSize: "20px",
-                                fontWeight: 600,
-                                color: "#18181b",
-                                margin: 0,
-                                cursor: 'pointer',
-                            }}
+                                    setIsRenaming(true);
+                                }}
+                            >
+                                {project.name}
+                            </h1>
+                        )}
+                        <button
                             onClick={() => {
                                 setNewName(project.name);
-                                setIsRenaming(true);
+                                setIsRenaming(!isRenaming);
                             }}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#6b7280',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                            }}
+                            title={isRenaming ? 'Cancel' : 'Rename project'}
                         >
-                            {project.name}
-                        </h1>
-                    )}
-                    <button
-                        onClick={() => {
-                            setNewName(project.name);
-                            setIsRenaming(!isRenaming);
-                        }}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#6b7280',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                        }}
-                        title={isRenaming ? 'Cancel' : 'Rename project'}
-                    >
-                        {isRenaming ? <XIcon size={16} /> : <PencilIcon size={16} />}
-                    </button>
-                </div>
-                <div style={{
-                    display: "flex",
-                    alignItems: 'center',
-                    gap: "16px",
-                    color: "#71717a",
-                    fontSize: "14px",
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span>{(threads.data?.length || 0)} threads</span>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={handleCreateThread}
-                            style={{ width: '24px', height: '24px' }}
-                        >
-                            <PlusIcon size={16} />
-                        </Button>
+                            {isRenaming ? <XIcon size={16} /> : <PencilIcon size={16} />}
+                        </button>
                     </div>
-                    <span>•</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span>{(promptsResult.data?.length || 0)} prompts</span>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={handleCreatePrompt}
-                            style={{ width: '24px', height: '24px' }}
-                        >
-                            <PlusIcon size={16} />
-                        </Button>
+                    <div style={{
+                        display: "flex",
+                        alignItems: 'center',
+                        gap: "10px",
+                        color: "#71717a",
+                        fontSize: "14px",
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span>{(threads.data?.length || 0)} threads</span>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={handleCreateThread}
+                                style={{ width: '24px', height: '24px' }}
+                            >
+                                <PlusIcon size={16} />
+                            </Button>
+                        </div>
+                        <span>•</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span>{(promptsResult.data?.length || 0)} prompts</span>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={handleCreatePrompt}
+                                style={{ width: '24px', height: '24px' }}
+                            >
+                                <PlusIcon size={16} />
+                            </Button>
+                        </div>
                     </div>
                 </div>
+                <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {promptsResult.refresh(); threads.refresh();}}
+                >
+                    <RotateCwIcon size={16} />
+                </Button>
             </div>
 
             <div style={{
@@ -1903,31 +2154,14 @@ export function ProjectPage({project: initialProject, api}: {project: Project | 
                         Threads
                     </h2>
                     <div style={{
-                        backgroundColor: "#fff",
-                        borderRadius: "8px",
+                        borderRadius: "15px",
                         border: "1px solid #e4e4e7",
+                        backgroundColor: "#fafafa",
                         overflow: "hidden",
                     }}>
                         {threads.data?.length ? (
                             threads.data.map((thread: ThreadType) => (
-                                <div 
-                                    key={thread.id}
-                                    onClick={() => threads.openThread(thread)}
-                                    style={{
-                                        cursor: 'pointer',
-                                        padding: '12px 16px',
-                                        borderBottom: '1px solid #f4f4f5',
-                                        backgroundColor: 'transparent',
-                                        transition: 'background-color 0.2s'
-                                    }}
-                                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#fafafa')}
-                                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                                >
-                                    <div style={{ fontWeight: 500 }}>{thread.name || 'Untitled Thread'}</div>
-                                    <div style={{ fontSize: '13px', color: '#71717a' }}>
-                                        {new Date(thread.createdAt).toLocaleString()}
-                                    </div>
-                                </div>
+                                <ChatListItem key={thread.id} thread={thread} onClick={() => openThread(thread)} reload={() => threads.refresh()}/>
                             ))
                         ) : (
                             <div style={{
@@ -1952,45 +2186,18 @@ export function ProjectPage({project: initialProject, api}: {project: Project | 
                         Prompts
                     </h2>
                     <div style={{
-                        backgroundColor: "#fff",
-                        borderRadius: "8px",
+                        borderRadius: "15px",
                         border: "1px solid #e4e4e7",
+                        backgroundColor: "#fafafa",
                         overflow: "hidden",
                     }}>
                         {promptsResult.data?.length ? (
                             promptsResult.data.map(prompt => (
-                                <div 
-                                    key={prompt.id} 
-                                    style={{
-                                        padding: "12px 16px",
-                                        borderBottom: "1px solid #f4f4f5",
-                                        cursor: "pointer",
-                                        transition: "background-color 0.2s",
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.backgroundColor = "#fafafa";
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.backgroundColor = "#ffffff";
-                                    }}
-                                >
-                                    <div style={{
-                                        fontWeight: 500,
-                                        marginBottom: "4px",
-                                    }}>
-                                        {prompt.name}
-                                    </div>
-                                    <div style={{
-                                        fontSize: "13px",
-                                        color: "#71717a",
-                                        whiteSpace: "nowrap",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                    }}>
-                                        {prompt.content.substring(0, 100)}
-                                        {prompt.content.length > 100 ? "..." : ""}
-                                    </div>
-                                </div>
+                                <PromptListItem
+                                    key={prompt.id}
+                                    prompt={prompt}
+                                    onClick={() => openPromptEditor(prompt)}
+                                />
                             ))
                         ) : (
                             <div style={{

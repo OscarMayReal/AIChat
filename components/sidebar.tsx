@@ -1,4 +1,4 @@
-import { HomeIcon, UsersIcon, LibraryIcon, BotIcon, PlusIcon, SparkleIcon, MessageSquareDashedIcon, MessageSquareIcon, MessageSquareLockIcon, Trash2Icon, ShareIcon, EditIcon, MoreVertical, ArchiveIcon } from "lucide-react"
+import { HomeIcon, UsersIcon, LibraryIcon, BotIcon, PlusIcon, SparkleIcon, MessageSquareDashedIcon, MessageSquareIcon, MessageSquareLockIcon, Trash2Icon, ShareIcon, EditIcon, MoreVertical, ArchiveIcon, PinIcon, PinOff, PinOffIcon, FolderInput, FolderInputIcon } from "lucide-react"
 import { useMutation, useQuery } from "convex/react";
 import React, { useState, useEffect } from "react";
 import { Thread } from "@/app/generated/prisma";
@@ -32,12 +32,11 @@ interface SidebarThreadsViewProps {
     setThreads: React.Dispatch<React.SetStateAction<{data: Thread[], loaded: boolean}>>;
 }
 
-const sidebarThreadsView = ({ orgid, threads, setSidebarChatTitle, setThreads }: SidebarThreadsViewProps) => {
+function ChatItem({thread, setSidebarChatTitle, setThreads}: {thread: Thread, setSidebarChatTitle: (title: {id: string, name: string}) => void, setThreads: React.Dispatch<React.SetStateAction<{data: Thread[], loaded: boolean}>>}) {
     const { showDialog, showConfirm } = useInputDialog();
     var currentOrg = authClient.useActiveOrganization()
-    return threads.map(thread => (
-        <div key={thread.id} style={{ position: 'relative', width: '100%' }}>
-            <SidebarItem 
+    return (
+        <SidebarItem 
                 onClick={() => {
                     let found = false;
                     (window as any).dockViewApi?.panels?.forEach?.((panel: any) => {
@@ -69,10 +68,10 @@ const sidebarThreadsView = ({ orgid, threads, setSidebarChatTitle, setThreads }:
                     maxWidth: "100%",
                     minWidth: "100%",
                 }}>
-                    {thread.organizationPublic ? (
-                        <MessageSquareIcon size={16} style={{ flexShrink: 0 }} />
+                    {thread.pinned ? (
+                        <PinIcon size={16} style={{ flexShrink: 0 }} />
                     ) : (
-                        <MessageSquareLockIcon size={16} style={{ flexShrink: 0 }} />
+                        <MessageSquareIcon size={16} style={{ flexShrink: 0 }} />
                     )}
                     <div style={{
                         overflow: "hidden",
@@ -104,7 +103,7 @@ const sidebarThreadsView = ({ orgid, threads, setSidebarChatTitle, setThreads }:
                                 <MoreVertical size={16} />
                             </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" side="right">
+                        <DropdownMenuContent align="end" side="right" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenuItem
                                 onClick={async (e) => {
                                     e.preventDefault();
@@ -258,40 +257,113 @@ const sidebarThreadsView = ({ orgid, threads, setSidebarChatTitle, setThreads }:
                                         setSidebarChatTitle({id: thread.id, name: thread.name});
                                     }
                                 }}>
-                                    <ShareIcon className="mr-2 h-4 w-4" />
-                                    <span>Toggle Organization Public</span>
+                                    <FolderInputIcon className="mr-2 h-4 w-4" />
+                                    <span>Move to Organization</span>
                                 </DropdownMenuItem>
                             )}
                             <DropdownMenuItem onClick={async () => {
-                                    const req = await fetch("/api/threads/" + thread.id, {
-                                        method: "PATCH",
-                                        headers: {
-                                            "Content-Type": "application/json",
-                                        },
-                                        body: JSON.stringify({ archived: !thread.archived, name: thread.name }),
+                                const req = await fetch("/api/threads/" + thread.id, {
+                                    method: "PATCH",
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({ archived: !thread.archived, name: thread.name }),
+                                });
+                                if (!req.ok) {
+                                    await showConfirm({
+                                        title: "Error",
+                                        description: "Failed to toggle archived. Please try again.",
+                                        confirmText: "OK"
                                     });
-                                    if (!req.ok) {
-                                        await showConfirm({
-                                            title: "Error",
-                                            description: "Failed to toggle organization public. Please try again.",
-                                            confirmText: "OK"
-                                        });
-                                    } else {
-                                        setSidebarChatTitle({id: thread.id, name: thread.name});
-                                    }
-                                }}>
-                                    <ArchiveIcon className="mr-2 h-4 w-4" />
-                                    <span>Archive</span>
-                                </DropdownMenuItem>
+                                } else {
+                                    setSidebarChatTitle({id: thread.id, name: thread.name});
+                                }
+                            }}>
+                                <ArchiveIcon className="mr-2 h-4 w-4" />
+                                <span>Archive</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={async () => {
+                                const req = await fetch("/api/threads/" + thread.id, {
+                                    method: "PATCH",
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({ pinned: !thread.pinned, name: thread.name }),
+                                });
+                                if (!req.ok) {
+                                    await showConfirm({
+                                        title: "Error",
+                                        description: "Failed to toggle pinned. Please try again.",
+                                        confirmText: "OK"
+                                    });
+                                } else {
+                                    setSidebarChatTitle({id: thread.id, name: thread.name});
+                                }
+                            }}>
+                                {thread.pinned ? (
+                                    <>
+                                        <PinOffIcon className="mr-2 h-4 w-4" />
+                                        <span>Unpin</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <PinIcon className="mr-2 h-4 w-4" />
+                                        <span>Pin</span>
+                                    </>
+                                )}
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
             </SidebarItem>
-        </div>
-    ))
+    )
+}
+
+const sidebarThreadsView = ({ orgid, threads, setSidebarChatTitle, setThreads }: SidebarThreadsViewProps) => {
+    return (
+        <>
+            {threads.filter(thread => thread.pinned && !thread.archived && !thread.organizationPublic).length > 0 && (
+                <>
+                    <div style={{
+                        marginTop: "10px",
+                        marginLeft: "12px",
+                        fontSize: "14px",
+                        color: "#666666",
+                        fontWeight: "500",
+                    }}> 
+                        Pinned Chats
+                    </div>
+                    {threads.filter(thread => thread.pinned && !thread.archived && !thread.organizationPublic && thread.projectId == null).map(thread => (
+                        <div key={thread.id} style={{ position: 'relative', width: '100%' }}>
+                            <ChatItem thread={thread} setSidebarChatTitle={setSidebarChatTitle} setThreads={setThreads}/>
+                        </div>
+                    ))}
+                </>
+            )}
+            {threads.filter(thread => !thread.pinned && !thread.archived && !thread.organizationPublic).length > 0 && (
+                <>
+                    <div style={{
+                        marginTop: "10px",
+                        marginLeft: "12px",
+                        fontSize: "14px",
+                        color: "#666666",
+                        fontWeight: "500",
+                    }}> 
+                        Your Chats
+                    </div>
+                    {threads.filter(thread => !thread.pinned && !thread.archived && !thread.organizationPublic && thread.projectId == null).map(thread => (
+                        <div key={thread.id} style={{ position: 'relative', width: '100%' }}>
+                            <ChatItem thread={thread} setSidebarChatTitle={setSidebarChatTitle} setThreads={setThreads}/>
+                        </div>
+                    ))}
+                </>
+            )}
+        </>
+    )
 }
 
 export function Sidebar() {
+    var session = authClient.useSession();
     var currentOrg = authClient.useActiveOrganization()
     const [threads, setThreads] = useState<{data: Thread[], loaded: boolean}>({data: [], loaded: false});
     
@@ -349,15 +421,11 @@ export function Sidebar() {
                 <PlusIcon size={16} />
                 New Chat
             </SidebarItem>
-            <SidebarItem>
-                <HomeIcon size={16} />
-                Home
-            </SidebarItem>
-            <SidebarItem>
+            {/* <SidebarItem>
                 <BotIcon size={16} />
                 Agents
-            </SidebarItem>
-            {currentOrg.data !== null && (
+            </SidebarItem> */}
+            {currentOrg.data !== null && (currentOrg.data.members.find(member => member.user.id === session.data?.user.id)?.role === "admin" || currentOrg.data.members.find(member => member.user.id === session.data?.user.id)?.role === "owner") && (
                 <SidebarItem onClick={() => {
                     (window as any).dockViewApi.addPanel({
                         component: "members",
@@ -389,37 +457,39 @@ export function Sidebar() {
                 backgroundColor: "#e4e4e7",
                 flexShrink: 0,
             }} />
-            <div style={{
-                marginTop: "10px",
-                marginLeft: "12px",
-                fontSize: "14px",
-                color: "#666666",
-                fontWeight: "500",
-            }}> 
-                Your Chats
-            </div>
-            {threads.data.length === 0 && (
-                <div style={{
-                    height: "100%",
-                    width: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "10px",
-                }}> 
-                    <MessageSquareDashedIcon size={25} />
+            {threads.data.filter(thread => !thread.organizationPublic && thread.projectId == null).length === 0 && (
+                <>
                     <div style={{
-                        fontSize: "16px",
+                        marginTop: "10px",
+                        marginLeft: "12px",
+                        fontSize: "14px",
                         color: "#666666",
                         fontWeight: "500",
-                    }}>Nothing Here</div>
+                    }}> 
+                        Your Chats
+                    </div>
                     <div style={{
-                        fontSize: "12px",
-                        color: "#999",
-                        fontWeight: "400",
-                    }}>Start a chat using the + button above</div>
-                </div>
+                        height: "100%",
+                        width: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "10px",
+                    }}> 
+                        <MessageSquareDashedIcon size={25} />
+                        <div style={{
+                            fontSize: "16px",
+                            color: "#666666",
+                            fontWeight: "500",
+                        }}>Nothing Here</div>
+                        <div style={{
+                            fontSize: "12px",
+                            color: "#999",
+                            fontWeight: "400",
+                        }}>Start a chat using the + button above</div>
+                    </div>
+                </>
             )}
             {sidebarThreadsView({
                 orgid: currentOrg.data?.id,

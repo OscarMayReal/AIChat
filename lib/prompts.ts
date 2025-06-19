@@ -33,12 +33,12 @@ export function useOrganizationPrompts() {
     return prompts;
 }
 
-export function useProjectPrompts(projectId: string) {
+export function useProjectPrompts(projectId: string | null) {
     var reload = () => {
         setPrompts({data: [], loaded: false, refresh: reload});
     }
     var [prompts, setPrompts] = useState<{data: Prompt[], loaded: boolean, refresh: () => void}>({data: [], loaded: false, refresh: reload});
-    if (!prompts.loaded) {
+    if (!prompts.loaded && projectId !== null) {
         fetch("/api/prompts/project?projectId=" + projectId).then(res => {
             if (res.status !== 200) {
                 setPrompts({data: [], loaded: true, refresh: reload});

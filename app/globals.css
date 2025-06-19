@@ -114,6 +114,12 @@ body {
   transition: background-color 0.15s ease-in-out;
 }
 
+/* .command-dialog {
+  position: fixed;
+  top: calc(10px);
+  transform: translateY(+50%);
+} */
+
 .sidebarItem:hover {
   background-color: #0000000f;
 }

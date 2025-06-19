@@ -21,6 +21,9 @@ export async function GET(request: NextRequest) {
             },
             organizationPublic: true,
         },
+        orderBy: {
+            updatedAt: "desc",
+        },
     })
     return new Response(JSON.stringify(threads), {
         headers: { "Content-Type": "application/json" },

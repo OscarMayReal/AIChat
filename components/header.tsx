@@ -1,7 +1,8 @@
-import { PanelLeftIcon, SparkleIcon } from "lucide-react"
+import { MessageSquareXIcon, PanelLeftIcon, SearchIcon, SparkleIcon } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 import { OrganizationSwitcher, UserButton } from "@daveyplate/better-auth-ui"
 import { TeamSwitcher } from "./org-switcher"
+import { DockviewApi } from "dockview-react"
 
 export function HeaderIcon() {
     return (
@@ -30,6 +31,37 @@ export function UserAvatar() {
             gap: "15px",
         }}>
             <UserButton size="icon" />
+        </div>
+    )
+}
+
+export function HeaderSearch() {
+    return (
+        <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "40%",
+            height: "30px",
+            borderRadius: "5px",
+            // backgroundColor: "#fff",
+            backgroundColor: "rgba(0, 0, 0, 0.05)",
+            border: "1px solid #e4e4e7",
+            position: "fixed",
+            top: "10px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            // zIndex: 1000,
+        }} onClick={() => {
+            (window as any).setCommandBarOpen()
+        }}>
+            <SearchIcon size={16} />
+            <div style={{
+                marginLeft: "12px",
+                fontSize: "14px",
+            }}>
+                Search AIChat
+            </div>
         </div>
     )
 }
@@ -95,7 +127,26 @@ export function Header({
             }} size="sm" />
             <div style={{
                 flex: 1,
-            }} />
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+            }} >
+                {hideSidebar != true && (
+                    <HeaderSearch />
+                )}
+            </div>
+            {hideSidebar != true && (
+                <MessageSquareXIcon
+                    style={{
+                        marginRight: "15px",
+                        cursor: "pointer",
+                    }}
+                    size={18}
+                    onClick={() => {
+                        (window as any).dockViewApi.clear();
+                    }}
+                />
+            )}
             <UserAvatar />
         </header>
     )

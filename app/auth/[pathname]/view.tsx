@@ -8,9 +8,9 @@ import {SparkleIcon} from "lucide-react"
 export function AuthView({ pathname }: { pathname: string }) {
     var alignItems = "flex-start";
     var height = "calc(100vh - 50px)";
-    if (pathname.includes("sign-in") || pathname.includes("sign-up")) {
+    if (pathname.includes("sign-in") || pathname.includes("sign-up") || pathname.includes("accept-invitation")) {
         alignItems = "center";
-        height = "100vh";
+        height = "100%";
     }
     
     return (
@@ -23,7 +23,9 @@ export function AuthView({ pathname }: { pathname: string }) {
                 flexDirection: "column",
                 alignItems: alignItems,
                 justifyContent: "center",
-                height: height,
+                maxHeight: height,
+                minHeight: height,
+                overflow: "scroll",
                 width: "100%",
                 padding: "40px",
             }}>

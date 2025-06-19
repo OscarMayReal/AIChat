@@ -153,11 +153,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
             )}
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="dialog-input" className="text-right">
-                {dialogState.dialogProps.label || 'Input'}
-              </Label>
-              <Input
+            <Input
                 id="dialog-input"
                 value={dialogState.inputValue}
                 onChange={(e) => 
@@ -166,7 +162,6 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                     inputValue: e.target.value
                   }))
                 }
-                className="col-span-3"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -174,7 +169,6 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   }
                 }}
               />
-            </div>
           </div>
           <DialogFooter>
             <Button 

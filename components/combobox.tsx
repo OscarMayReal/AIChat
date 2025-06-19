@@ -80,7 +80,10 @@ export function ModelSelector({options, value, setValue, optionLabel, style}: {o
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-[200px] justify-between"
+            className="justify-between"
+            style={{
+                width: "fit-content",
+            }}
             style={style}
           >
             {value

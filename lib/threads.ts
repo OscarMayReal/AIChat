@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { Thread } from "@/app/generated/prisma";
+import { Project, Thread } from "@/app/generated/prisma";
 
-export function useThreads(): {data: Thread[], loaded: boolean} {
-    const [threads, setThreads] = useState<{data: Thread[], loaded: boolean}>({data: [], loaded: false});
+export function useThreads(): {data: Thread[], loaded: boolean, refresh: () => void} {
+    var reload = () => {
+        setThreads({data: threads.data, loaded: false, refresh: reload});
+    }
+    const [threads, setThreads] = useState<{data: Thread[], loaded: boolean, refresh: () => void}>({data: [], loaded: false, refresh: reload});
     if (!threads.loaded) {
         fetch("/api/threads").then(res => res.json()).then(data => {
-            setThreads({data: data, loaded: true});
+            setThreads({data: data, loaded: true, refresh: reload});
         });
     }
     return threads;
@@ -36,31 +39,40 @@ export function openThread(thread: Thread, setSidebarChatTitle?: (title: {id: st
     }
 }
 
-export function useArchivedThreads(): {data: Thread[], loaded: boolean} {
-    const [threads, setThreads] = useState<{data: Thread[], loaded: boolean}>({data: [], loaded: false});
+export function useArchivedThreads(): {data: Thread[], loaded: boolean, refresh: () => void} {
+    var reload = () => {
+        setThreads({data: threads.data, loaded: false, refresh: reload});
+    }
+    const [threads, setThreads] = useState<{data: Thread[], loaded: boolean, refresh: () => void}>({data: [], loaded: false, refresh: reload});
     if (!threads.loaded) {
-        fetch("/api/threads/archived").then(res => res.json()).then(data => {
-            setThreads({data: data, loaded: true});
+        fetch("/api/threads").then(res => res.json()).then((data: Thread[]) => {
+            setThreads({data: data.filter(thread => thread.archived), loaded: true, refresh: reload});
         });
     }
     return threads;
 }
 
-export function useProjectThreads(projectId: string): {data: Thread[], loaded: boolean} {
-    const [threads, setThreads] = useState<{data: Thread[], loaded: boolean}>({data: [], loaded: false});
+export function useProjectThreads(projectId: string): {data: Thread[], loaded: boolean, refresh: () => void} {
+    var reload = () => {
+        setThreads({data: threads.data, loaded: false, refresh: reload});
+    }
+    const [threads, setThreads] = useState<{data: Thread[], loaded: boolean, refresh: () => void}>({data: [], loaded: false, refresh: reload});
     if (!threads.loaded) {
-        fetch(`/api/threads/project/${projectId}`).then(res => res.json()).then(data => {
-            setThreads({data: data, loaded: true});
+        fetch(`/api/threads/project?projectId=${projectId}`).then(res => res.json()).then(data => {
+            setThreads({data: data, loaded: true, refresh: reload});
         });
     }
     return threads;
 }
 
-export function useOrganizationThreads(): {data: Thread[], loaded: boolean} {
-    const [threads, setThreads] = useState<{data: Thread[], loaded: boolean}>({data: [], loaded: false});
+export function useOrganizationThreads(): {data: Thread[], loaded: boolean, refresh: () => void} {
+    var reload = () => {
+        setThreads({data: threads.data, loaded: false, refresh: reload});
+    }
+    const [threads, setThreads] = useState<{data: Thread[], loaded: boolean, refresh: () => void}>({data: [], loaded: false, refresh: reload});
     if (!threads.loaded) {
         fetch("/api/threads/organization").then(res => res.json()).then(data => {
-            setThreads({data: data, loaded: true});
+            setThreads({data: data, loaded: true, refresh: reload});
         });
     }
     return threads;
@@ -106,6 +118,19 @@ export function openOrganizationChats(): void {
 
 export async function createThread(name: string): Promise<Thread> {
     const response = await fetch("/api/threads", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            name,
+        }),
+    });
+    return await response.json();
+}
+
+export async function createProjectThread(name: string, project: Project): Promise<Thread> {
+    const response = await fetch(`/api/threads/project?projectId=${project.id}`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -199,6 +224,98 @@ export async function deleteThread(threadId: string): Promise<{ success: boolean
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
         console.error('[deleteThread] Error:', errorMessage, error);
+        return { 
+            success: false, 
+            error: errorMessage
+        };
+    }
+}
+
+export async function archiveThread(thread: Thread): Promise<{ success: boolean; error?: string }> {
+    console.log('[archiveThread] Starting archiving for thread:', thread.id);
+    
+    try {
+        const url = `/api/threads/${thread.id}`;
+        console.log('[archiveThread] Sending PATCH request to:', url);
+        
+        const response = await fetch(url, {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ archived: !thread.archived, name: thread.name }),
+        });
+
+        console.log('[archiveThread] Response status:', response.status);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[archiveThread] Error response:', errorText);
+            let errorData;
+            try {
+                errorData = JSON.parse(errorText);
+            } catch (e) {
+                errorData = { error: errorText };
+            }
+            const errorMsg = errorData.error || `Failed to archive thread (${response.status} ${response.statusText})`;
+            return { 
+                success: false, 
+                error: errorMsg
+            };
+        }
+
+        console.log('[archiveThread] Thread archived successfully');
+        return { success: true };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+        console.error('[archiveThread] Error:', errorMessage, error);
+        return { 
+            success: false, 
+            error: errorMessage
+        };
+    }
+}
+
+export async function moveThreadToOrganization(thread: Thread): Promise<{ success: boolean; error?: string }> {
+    console.log('[moveThreadToOrganization] Starting moving for thread:', thread.id);
+    
+    try {
+        const url = `/api/threads/${thread.id}`;
+        console.log('[moveThreadToOrganization] Sending PATCH request to:', url);
+        
+        const response = await fetch(url, {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ organizationPublic: !thread.organizationPublic, name: thread.name }),
+        });
+
+        console.log('[moveThreadToOrganization] Response status:', response.status);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[moveThreadToOrganization] Error response:', errorText);
+            let errorData;
+            try {
+                errorData = JSON.parse(errorText);
+            } catch (e) {
+                errorData = { error: errorText };
+            }
+            const errorMsg = errorData.error || `Failed to move thread (${response.status} ${response.statusText})`;
+            return { 
+                success: false, 
+                error: errorMsg
+            };
+        }
+
+        console.log('[moveThreadToOrganization] Thread moved successfully');
+        return { success: true };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+        console.error('[moveThreadToOrganization] Error:', errorMessage, error);
         return { 
             success: false, 
             error: errorMessage

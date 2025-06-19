@@ -1,4 +1,4 @@
-import { SearchIcon, KeyIcon } from "lucide-react";
+import { SearchIcon, KeyIcon, HammerIcon } from "lucide-react";
 
 export const models = [
     // {
@@ -32,6 +32,22 @@ export const models = [
                 defaultValue: false,
                 friendlyName: "Search",
                 icon: SearchIcon,
+            }
+        ]
+    },
+    {
+        name: "gemini-2.0-flash-lite",
+        label: "Gemini 2.0 Flash Lite (For Tools)",
+        description: "Google's fastest and most efficient model, optimized for speed and general-purpose tasks with excellent reasoning capabilities.",
+        provider: "google",
+        capabilities: [
+            {
+                name: "useTools",
+                description: "Use tools to provide context to the model.",
+                type: "boolean",
+                defaultValue: true,
+                friendlyName: "Tools",
+                icon: HammerIcon,
             }
         ]
     },
@@ -201,18 +217,18 @@ export const models = [
     },
 ]
 
-export type capability = {
+export interface capability {
     name: string;
     description: string;
     type: string;
     defaultValue?: any;
-    value?: string;  // Add value property to store the actual value (e.g., API key)
+    value?: boolean | string | undefined;
     required?: boolean;
     friendlyName?: string;
     icon?: any;
 }
 
-export type model = {
+export interface model {
     name: string;
     label: string;
     description: string;

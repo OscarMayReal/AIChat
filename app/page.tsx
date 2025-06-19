@@ -7,6 +7,8 @@ import { Shell } from "@/components/shell";
 
 import { useEffect } from "react";
 
+import { CommandBar } from "@/components/commandbar";
+
 import {
   DockviewApi,
   DockviewReact,
@@ -146,62 +148,20 @@ const tabComponents = {
         padding: '0 8px',
         gap: '8px',
       }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          fontSize: '12px',
-          fontWeight: 500,
-          color: 'var(--dv-tab-active-text-color)',
-          height: '100%',
-          overflow: 'hidden',
-          flex: 1,
-        }}>
-          <FolderOpenIcon size={14} style={{ flexShrink: 0 }} />
-          <span style={{
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: 'inline-block',
-            lineHeight: '1.5',
-          }} title={project?.name || 'Project'}>
-            {project?.name || 'Project'}
-          </span>
-        </div>
-        <button
+        <FolderOpenIcon size={16} />
+        <div>{props.api.title}</div>
+        <XIcon 
+          size={16} 
+          style={{
+            flexShrink: 0,
+            marginLeft: '5px',
+            cursor: 'pointer',
+          }} 
           onClick={(e) => {
             e.stopPropagation();
-            e.preventDefault();
             props.api.close();
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--dv-inactivegroup-visiblepanel-tab-color)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '16px',
-            height: '16px',
-            borderRadius: '2px',
-            flexShrink: 0,
-            padding: 0,
-            margin: 0,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--dv-tab-active-background)';
-            e.currentTarget.style.color = 'var(--dv-tab-active-text-color)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'var(--dv-inactivegroup-visiblepanel-tab-color)';
-          }}
-          title="Close tab"
-        >
-          <XIcon size={12} />
-        </button>
+          }} 
+        />
       </div>
     );
   },
@@ -516,6 +476,7 @@ export default function Home() {
     <>
       <SignedIn>
         <Shell>
+          <CommandBar />
           <DockviewWrapper />
         </Shell>
       </SignedIn>

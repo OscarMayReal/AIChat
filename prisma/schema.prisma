@@ -25,6 +25,9 @@ model Thread {
   public         Boolean @default(false)
   project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   archived       Boolean @default(false)
+  pinned         Boolean @default(false)
+  agentId String?
+  agent Agent? @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
 
   @@index([ownerId])
@@ -40,6 +43,18 @@ model Message {
   role      String
   senderId  String?
   model String @default("gemini-2.0-flash")
+  agentId String?
+}
+
+model Agent {
+    id String @id @default(cuid())
+    name String
+    ownerId String
+    organizationId String?
+    threads Thread[]
+    systemPrompt String
+    createdAt DateTime @default(now())
+    organizationPublic Boolean @default(false)
 }
 
 model Prompt {

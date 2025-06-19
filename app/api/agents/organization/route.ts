@@ -1,59 +1,52 @@
+import { PrismaClient } from "@/app/generated/prisma";
 import { auth } from "@/auth";
 import { headers } from "next/headers";
-import { PrismaClient } from "@/app/generated/prisma";
+
 
 const prisma = new PrismaClient();
 
 export async function GET(request: Request) {
     const user = await auth.api.getSession({headers: await headers()})
-    if (!user) {
+    if (!user || !user.session.activeOrganizationId) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },
         });
     }
-    const { threadId } = await request.json();
-    const messages = await prisma.message.findMany({
+    const agents = await prisma.agent.findMany({
         where: {
-            threadId,
+            organizationId: user.session.activeOrganizationId,
+            ownerId: user.session.userId,
+            organizationPublic: true
+        },
+        orderBy: {
+            createdAt: "desc",
         },
     })
-    return new Response(JSON.stringify(messages), {
+    return new Response(JSON.stringify(agents), {
         headers: { "Content-Type": "application/json" },
     })
 }
 
 export async function POST(request: Request) {
     const user = await auth.api.getSession({headers: await headers()})
-    if (!user) {
+    if (!user || !user.session.activeOrganizationId) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },
         });
     }
-    const { threadId, text, role } = await request.json();
-    const message = await prisma.message.create({
+    const { name, systemPrompt } = await request.json();
+    const agent = await prisma.agent.create({
         data: {
-            threadId,
-            text,
-            role,
+            name,
+            systemPrompt,
+            ownerId: user.session.userId,
+            organizationId: user.session.activeOrganizationId,
+            organizationPublic: true,
         },
     })
-    var thread = await prisma.thread.findUnique({
-        where: {
-            id: threadId,
-        },
-    })
-    if (thread) {
-        thread.updatedAt = new Date();
-        await prisma.thread.update({
-            where: {
-                id: threadId,
-            },
-            data: thread,
-        })
-    }
-    return new Response(JSON.stringify(message), {
+    return new Response(JSON.stringify(agent), {
         headers: { "Content-Type": "application/json" },
     })
 }

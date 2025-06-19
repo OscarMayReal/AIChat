@@ -1,6 +1,6 @@
 import { streamText, type Message } from "ai";
 import { google } from "@ai-sdk/google";
-import { openrouter } from "@openrouter/ai-sdk-provider";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { models, type model as ModelType } from "@/lib/models";
 
 type Capability = {
@@ -97,9 +97,10 @@ export async function POST(request: Request) {
             }
         }
 
-        let stream: ReturnType<typeof streamText> | null = null;
+        var stream: ReturnType<typeof streamText> | null = null;
         
         if (model.provider === 'google') {
+            console.log(capabilities);
             const useSearchGrounding = capabilities.find((cap: any) => cap.name === "useSearchGrounding")?.value || false;
             console.log(`Initializing Google model: ${model.name}`, { useSearchGrounding });
             
@@ -141,136 +142,25 @@ export async function POST(request: Request) {
                 throw new Error('API key is required for OpenRouter models. Please provide an API key in the model settings.');
             }
 
-            // Make a direct fetch to OpenRouter API
-            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                method: 'POST',
+            // Configure the OpenRouter model with the AI SDK and API key
+            const openrouterProvider = createOpenRouter({
+                apiKey: apiKey,
                 headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json',
                     'HTTP-Referer': 'https://your-site-url.com',
                     'X-Title': 'Your App Name'
-                },
-                body: JSON.stringify({
-                    model: model.name,
-                    messages: messages.map(({ role, content }: { role: string; content: string }) => ({
-                        role: role as 'user' | 'assistant' | 'system',
-                        content: content
-                    })),
-                    stream: true
-                })
-            });
-
-            if (!response.ok) {
-                const error = await response.text();
-                console.error('OpenRouter API error:', error);
-                throw new Error(`OpenRouter API error: ${error}`);
-            }
-
-            if (!response.body) {
-                throw new Error('No response body from OpenRouter');
-            }
-
-            // Create a new ReadableStream to process the response
-            const encoder = new TextEncoder();
-            const decoder = new TextDecoder();
-            let buffer = '';
-            let messageCount = 0;
-            
-            const stream = new ReadableStream({
-                async start(controller) {
-                    console.log('Starting stream processing for OpenRouter response');
-                    const reader = response.body!.getReader();
-                    
-                    try {
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            console.log('Read chunk from OpenRouter:', { done, value: value ? '[...]' : 'undefined' });
-                            
-                            if (done) {
-                                console.log('OpenRouter stream ended');
-                                break;
-                            }
-                            
-                            // Process the chunk
-                            const chunk = decoder.decode(value, { stream: true });
-                            console.log('Decoded chunk:', chunk);
-                            buffer += chunk;
-                            
-                            // Process complete SSE messages
-                            const lines = buffer.split('\n\n');
-                            buffer = lines.pop() || '';
-                            
-                            console.log(`Processing ${lines.length} complete SSE messages`);
-                            
-                            for (const line of lines) {
-                                console.log('Processing line:', line);
-                                
-                                if (line.trim() === 'data: [DONE]') {
-                                    console.log('Received [DONE] signal');
-                                    controller.close();
-                                    return;
-                                }
-                                
-                                if (line.startsWith('data: ')) {
-                                    try {
-                                        const jsonStr = line.slice(6);
-                                        console.log('Parsing JSON:', jsonStr);
-                                        const data = JSON.parse(jsonStr);
-                                        
-                                        if (data.choices?.[0]?.delta?.content) {
-                                            messageCount++;
-                                            const content = data.choices[0].delta.content;
-                                            console.log(`Sending content chunk ${messageCount}:`, content);
-                                            
-                                            const chunkData = {
-                                                id: data.id || `chatcmpl-${Date.now()}-${messageCount}`,
-                                                object: 'chat.completion.chunk',
-                                                created: Math.floor(Date.now() / 1000),
-                                                model: model.name,
-                                                choices: [{
-                                                    index: 0,
-                                                    delta: { content },
-                                                    finish_reason: null
-                                                }]
-                                            };
-                                            
-                                            controller.enqueue(
-                                                encoder.encode(`data: ${JSON.stringify(chunkData)}\n\n`)
-                                            );
-                                        } else {
-                                            console.log('No content in delta, skipping');
-                                        }
-                                    } catch (e) {
-                                        console.error('Error parsing SSE message:', e, 'Line:', line);
-                                    }
-                                }
-                            }
-                        }
-                        
-                        if (buffer) {
-                            console.log('Processing remaining buffer:', buffer);
-                            controller.enqueue(encoder.encode(`data: ${buffer}\n\n`));
-                        }
-                        
-                        console.log('Closing controller, total messages processed:', messageCount);
-                        controller.close();
-                    } catch (error) {
-                        console.error('Stream error:', error);
-                        controller.error(error);
-                    }
                 }
             });
-            
-            console.log('Created ReadableStream with response processing logic');
+            const openRouterModel = openrouterProvider(model.name);
 
-            // Return the transformed stream
-            return new Response(stream, {
-                headers: {
-                    'Content-Type': 'text/event-stream',
-                    'Cache-Control': 'no-cache',
-                    'Connection': 'keep-alive',
-                    'X-Accel-Buffering': 'no',
-                    'Transfer-Encoding': 'chunked'
+            // Create the stream using the AI SDK
+            stream = streamText({
+                model: openRouterModel,
+                messages: messages.map(({ role, content }: { role: string; content: string }) => ({
+                    role: role as 'user' | 'assistant' | 'system',
+                    content: content
+                })),
+                onError: (error) => {
+                    console.error('OpenRouter stream error:', error);
                 }
             });
         }

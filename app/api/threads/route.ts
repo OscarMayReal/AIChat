@@ -18,6 +18,9 @@ export async function GET(request: Request) {
             organizationId: user.session.activeOrganizationId,
             ownerId: user.session.userId,
         },
+        orderBy: {
+            updatedAt: "desc",
+        },
     })
     return new Response(JSON.stringify(threads), {
         headers: { "Content-Type": "application/json" },
