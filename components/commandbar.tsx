@@ -16,6 +16,14 @@ import { DockviewApi } from "dockview-react";
 import { openProject, openProjectLibrary, useProjects } from "@/lib/projects";
 import { openPromptsLibrary } from "@/lib/prompts";
 
+// Extend the Window interface to include our custom properties
+declare global {
+  interface Window {
+    setCommandBarOpen: () => void;
+    dockviewApi?: DockviewApi; // Using the imported DockviewApi type
+  }
+}
+
 export function CommandBar() {
     const [open, setOpen] = React.useState(false)
     var chats = useThreads()

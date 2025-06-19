@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
         });
     }
     const projectId = request.nextUrl.searchParams.get("projectId")!;
-    console.log(projectId);
+    //console.log(projectId);
     const threads = await prisma.thread.findMany({
         where: {
             projectId: projectId,

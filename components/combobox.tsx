@@ -83,8 +83,8 @@ export function ModelSelector({options, value, setValue, optionLabel, style}: {o
             className="justify-between"
             style={{
                 width: "fit-content",
+                ...style
             }}
-            style={style}
           >
             {value
               ? options.find((option) => option === value)?.label

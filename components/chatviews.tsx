@@ -44,6 +44,7 @@ interface ThreadWithDetails {
 interface ProjectThreadsResult {
   data?: ThreadType[];
   loaded: boolean;
+  refresh: () => void;
 }
 
 interface ProjectPromptsResult {
@@ -79,7 +80,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
-import { createOrganizationPrompt, createPersonalPrompt, openPromptEditor, openPromptsLibrary, updatePrompt, useOrganizationPrompts, usePersonalPrompts, useProjectPrompts } from "@/lib/prompts";
+import { createOrganizationPrompt, createPersonalPrompt, DeletePrompt, openPromptEditor, openPromptsLibrary, updatePrompt, useOrganizationPrompts, usePersonalPrompts, useProjectPrompts } from "@/lib/prompts";
 import { openProject, openProjectLibrary, useProjects } from "@/lib/projects";
 import { Project } from "@/app/generated/prisma";
 import { useInputDialog } from "./ui/input-dialog";
@@ -683,12 +684,13 @@ export function CapabilitySelector({
     const handleApiKeyClick = async () => {
         console.log('API key button clicked');
         try {
-            const currentApiKey = value.find(c => c.name === 'apiKey')?.value || '';
+            const currentApiKey = value.find(c => c.name === 'apiKey')?.value;
+            const defaultValue = typeof currentApiKey === 'string' ? currentApiKey : '';
             
             const apiKey = await showDialog({
                 title: 'Enter OpenRouter API Key',
                 description: 'Enter your OpenRouter API key to use OpenRouter models',
-                defaultValue: currentApiKey
+                defaultValue: defaultValue
             });
             
             console.log('Dialog closed with API key:', apiKey ? '***' : 'cancelled');
@@ -1232,7 +1234,7 @@ export function LibraryPrompts({panelapi}: {panelapi: DockviewPanelApi}) {
                             </div>
                         )}
                         {personalPrompts.data?.map(prompt => (
-                            <PromptListItem key={prompt.id} prompt={prompt} onClick={() => openPromptEditor(prompt)} />
+                            <PromptListItem key={prompt.id} prompt={prompt} onClick={() => openPromptEditor(prompt)} refresh={personalPrompts.refresh} />
                         ))}
                     </div>
                 </TabsContent>
@@ -1267,7 +1269,7 @@ export function LibraryPrompts({panelapi}: {panelapi: DockviewPanelApi}) {
                             </div>
                         )}
                         {organizationPrompts.data?.map(prompt => (
-                            <PromptListItem key={prompt.id} prompt={prompt} onClick={() => openPromptEditor(prompt)} />
+                            <PromptListItem key={prompt.id} prompt={prompt} onClick={() => openPromptEditor(prompt)} refresh={organizationPrompts.refresh} />
                         ))}
                     </div>
                 </TabsContent>
@@ -1276,7 +1278,8 @@ export function LibraryPrompts({panelapi}: {panelapi: DockviewPanelApi}) {
     )
 }
 
-function PromptListItem({prompt, onClick}: {prompt: Prompt, onClick?: () => void}) {
+function PromptListItem({prompt, onClick, refresh}: {prompt: Prompt, onClick?: () => void, refresh?: () => void}) {
+    var {showConfirm} = useInputDialog();
     return (
         <div style={{
             padding: "10px",
@@ -1309,6 +1312,23 @@ function PromptListItem({prompt, onClick}: {prompt: Prompt, onClick?: () => void
                     fontWeight: "400",
                 }}>{prompt.description}</div>
             </div>
+            <div style={{
+                flexGrow: 1,
+            }}/>
+            <Button variant="outline" onClick={async (event) => {
+                event.stopPropagation();
+                var dec = await showConfirm({
+                    title: "Delete Prompt",
+                    description: "Are you sure you want to delete this prompt?",
+                });
+                if (dec) {
+                    await DeletePrompt(prompt);
+                    refresh?.();
+                    (window as any).dockViewApi?.removePanel("prompt_editor_id_" + prompt.id);
+                }
+            }}>
+                <Trash2Icon size={16} />
+            </Button>
         </div>
     )
 }

@@ -33,6 +33,16 @@ export function useOrganizationPrompts() {
     return prompts;
 }
 
+export async function DeletePrompt(prompt: Prompt) {
+    var response = await fetch("/api/prompts/" + prompt.id, {
+        method: "DELETE",
+    });
+    if (response.status !== 200) {
+        throw new Error("Failed to delete prompt");
+    }
+    return response.json();
+}
+
 export function useProjectPrompts(projectId: string | null) {
     var reload = () => {
         setPrompts({data: [], loaded: false, refresh: reload});
@@ -90,8 +100,8 @@ export function openPromptsLibrary() {
 export function openPromptEditor(prompt: Prompt): void {
     var found = false;
     (window as any).dockViewApi.panels.forEach((panel: any) => {
-        console.log(panel.id, prompt.id);
-        if (panel.id === prompt.id) {
+        console.log(panel.id, "prompt_editor_id_" + prompt.id);
+        if (panel.id === "prompt_editor_id_" + prompt.id) {
             console.log("Panel found");
             panel.focus();
             found = true;
@@ -102,7 +112,7 @@ export function openPromptEditor(prompt: Prompt): void {
         (window as any).dockViewApi?.addPanel({
             component: "promptEditor",
             title: prompt.name,
-            id: prompt.id,
+            id: "prompt_editor_id_" + prompt.id,
             tabComponent: "promptEditor",
             params: {
                 prompt,

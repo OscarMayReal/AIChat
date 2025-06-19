@@ -34,13 +34,13 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-    console.log('[PATCH /api/threads/[id]] Request received');
+    //console.log('[PATCH /api/threads/[id]] Request received');
     
     try {
         // Authenticate user
         const user = await auth.api.getSession({ headers: await headers() });
         if (!user) {
-            console.log('[PATCH /api/threads/[id]] Unauthorized');
+            //console.log('[PATCH /api/threads/[id]] Unauthorized');
             return NextResponse.json(
                 { error: "Unauthorized" },
                 { status: 401, headers: { "Content-Type": "application/json" } }
@@ -72,7 +72,7 @@ export async function PATCH(request: Request) {
             );
         }
 
-        console.log(`[PATCH /api/threads/[id]] Updating thread ${threadId} with:`, updateData);
+        //console.log(`[PATCH /api/threads/[id]] Updating thread ${threadId} with:`, updateData);
 
         // Update thread in database
         const updatedThread = await prisma.thread.update({
@@ -80,7 +80,7 @@ export async function PATCH(request: Request) {
             data: updateData,
         });
 
-        console.log(`[PATCH /api/threads/[id]] Thread ${threadId} updated successfully`);
+        //console.log(`[PATCH /api/threads/[id]] Thread ${threadId} updated successfully`);
         return NextResponse.json(updatedThread, {
             status: 200,
             headers: { "Content-Type": "application/json" },
@@ -111,13 +111,13 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-    console.log('[DELETE /api/threads/[id]] Request received');
+    //console.log('[DELETE /api/threads/[id]] Request received');
     
     try {
         // Authenticate user
         const user = await auth.api.getSession({ headers: await headers() });
         if (!user) {
-            console.log('[DELETE /api/threads/[id]] Unauthorized');
+            //console.log('[DELETE /api/threads/[id]] Unauthorized');
             return NextResponse.json(
                 { error: "Unauthorized" },
                 { status: 401, headers: { "Content-Type": "application/json" } }
@@ -134,7 +134,7 @@ export async function DELETE(request: Request) {
             );
         }
 
-        console.log(`[DELETE /api/threads/[id]] Processing delete for thread ${threadId}`);
+        //console.log(`[DELETE /api/threads/[id]] Processing delete for thread ${threadId}`);
 
         // Check if thread exists and user has permission
         const thread = await prisma.thread.findUnique({
@@ -143,7 +143,7 @@ export async function DELETE(request: Request) {
         });
 
         if (!thread) {
-            console.log(`[DELETE /api/threads/[id]] Thread ${threadId} not found`);
+            //console.log(`[DELETE /api/threads/[id]] Thread ${threadId} not found`);
             return NextResponse.json(
                 { error: "Thread not found" },
                 { status: 404, headers: { "Content-Type": "application/json" } }
@@ -151,7 +151,7 @@ export async function DELETE(request: Request) {
         }
 
         if (thread.ownerId !== user.user.id) {
-            console.log(`[DELETE /api/threads/[id]] Forbidden: User ${user.user.id} does not own thread ${threadId}`);
+            //console.log(`[DELETE /api/threads/[id]] Forbidden: User ${user.user.id} does not own thread ${threadId}`);
             return NextResponse.json(
                 { error: "Forbidden" },
                 { status: 403, headers: { "Content-Type": "application/json" } }
@@ -159,10 +159,10 @@ export async function DELETE(request: Request) {
         }
 
         // Delete the thread
-        console.log(`[DELETE /api/threads/[id]] Deleting thread ${threadId}...`);
+        //console.log(`[DELETE /api/threads/[id]] Deleting thread ${threadId}...`);
         await prisma.thread.delete({ where: { id: threadId } });
         
-        console.log(`[DELETE /api/threads/[id]] Thread ${threadId} deleted successfully`);
+        //console.log(`[DELETE /api/threads/[id]] Thread ${threadId} deleted successfully`);
         return NextResponse.json(
             { success: true },
             { status: 200, headers: { "Content-Type": "application/json" } }
