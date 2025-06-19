@@ -1,5 +1,6 @@
 import { useChat } from "@ai-sdk/react";
 import * as React from 'react';
+import { useToast } from "@/components/ui/use-toast";
 import { 
   RotateCw as RotateCwIcon, 
   Send as SendIcon, 
@@ -29,10 +30,43 @@ import {
   MessageSquare,
   MessageSquareOffIcon,
   ArchiveRestoreIcon,
-  ChevronLeftIcon
+  ChevronLeftIcon,
+  Code as CodeIcon
 } from "lucide-react";
-import { Thread as ThreadType } from "@/app/generated/prisma";
+import { ToolCallPanel } from "@/components/chat/ToolCallPanel";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
+import { Thread as ThreadType } from "@/app/generated/prisma";
+
+// Import components with unique names to avoid circular dependencies
+import { ModelSelector as OriginalModelSelector } from "@/components/combobox";
+
+// Define props for the ChatBar component
+// Local project interface for ChatBar
+interface ChatBarProject {
+  id: string;
+  name: string;
+  description: string;
+  ownerId: string;
+  organizationId: string | null;
+  parentId: string | null;
+  organizationPublic: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface ChatBarProps {
+  input: string;
+  handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement> | string) => void;
+  handleSubmit: (e?: React.FormEvent) => Promise<void>;
+  model: model;
+  enabledCapabilities: capability[];
+  setModel: (model: model) => void;
+  setEnabledCapabilities: (capabilities: capability[]) => void;
+  currentProject: Project | null;
+  thispanel: DockviewPanel;
+}
 
 interface ThreadWithDetails {
   data?: ThreadType[];
@@ -55,11 +89,10 @@ interface ProjectPromptsResult {
 import { useMutation, useQuery } from "convex/react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Toggle } from "@/components/ui/toggle";
-import { models, model, capability } from "@/lib/models";
-import { ModelSelector } from "@/components/combobox";
+import { models, type model, type capability } from "@/lib/models";
 import { useEffect, useRef, useState } from "react";
 import { Thread, Message, Prompt } from "@/app/generated/prisma";
-import { DockviewPanel, DockviewPanelApi } from "dockview-react";
+import type { DockviewPanel, DockviewPanelApi } from "dockview-react";
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
@@ -491,6 +524,18 @@ async function replaceVariablesAsync(inputString: string, showDialog: (options: 
     return resultString;
 }
 
+interface ChatBarProps {
+    input: string;
+    handleInputChange: (value: string) => void;
+    handleSubmit: (e?: React.FormEvent) => Promise<void>;
+    model: model;
+    enabledCapabilities: capability[];
+    setModel: (model: model) => void;
+    setEnabledCapabilities: (enabledCapabilities: capability[]) => void;
+    currentProject: ChatBarProject | null;
+    thispanel: any; // Using any as a fallback for DockviewPanel type
+}
+
 export function ChatBar({
     input,
     handleInputChange,
@@ -500,7 +545,6 @@ export function ChatBar({
     setModel,
     setEnabledCapabilities,
     currentProject,
-    thispanel,
 }: {
     input: string;
     handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement> | string) => void;
@@ -510,11 +554,8 @@ export function ChatBar({
     setModel: (model: model) => void;
     setEnabledCapabilities: (enabledCapabilities: capability[]) => void;
     currentProject: Project | null;
-    thispanel: DockviewPanel;
 }) {
-    const {showDialog} = useInputDialog();
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    var textAreaRef = useRef<HTMLTextAreaElement>(null);
+    const [isSubmitting, setIsSubmitting] = React.useState(false);
     
     const handleFormSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -529,16 +570,8 @@ export function ChatBar({
             setIsSubmitting(false);
         }
     };
+    
     return (
-        thispanel.api.onDidActiveChange(() => {
-            console.log("Active changed");
-            if (thispanel.api.isActive) {
-                console.log("Active");
-                setTimeout(() => {
-                    textAreaRef.current?.focus();
-                }, 100);
-            }
-        }),
         <form onSubmit={handleFormSubmit} style={{
             boxShadow: "rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px",
             padding: "5px",
@@ -558,7 +591,6 @@ export function ChatBar({
         }}>
             <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <textarea
-                    ref={textAreaRef}
                     value={input}
                     onChange={handleInputChange}
                     style={{
@@ -591,16 +623,12 @@ export function ChatBar({
                     padding: '0 5px 5px',
                 }}>
                     <PromptSelector 
-                        setInput={async(value) => {
-                            const newValue = await replaceVariablesAsync(value, async (options) => {
-                                const result = await showDialog(options);
-                                return result;
-                            });
-                            handleInputChange(newValue);
+                        setInput={(value) => {
+                            handleInputChange(value);
                             const textarea = document.querySelector('textarea');
                             if (textarea) {
                                 textarea.focus();
-                                const length = newValue.length;
+                                const length = value.length;
                                 textarea.setSelectionRange(length, length);
                             }
                         }} 

@@ -3,6 +3,7 @@ import "allotment/dist/style.css";
 import { Figtree } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./generated/providers";
+import { Toaster } from "@/components/ui/toaster";
 
 const figtree = Figtree({
   variable: "--font-geist-sans",
@@ -24,6 +25,7 @@ export default function RootLayout({
       >
         <Providers>
           {children}
+          <Toaster />
         </Providers>
       </body>
     </html>

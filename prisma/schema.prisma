@@ -28,7 +28,7 @@ model Thread {
   pinned         Boolean @default(false)
   agentId String?
   agent Agent? @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
+  toolExecutions ToolExecution[]
 
   @@index([ownerId])
   @@index([organizationId])
@@ -44,6 +44,7 @@ model Message {
   senderId  String?
   model String @default("gemini-2.0-flash")
   agentId String?
+  toolExecutions ToolExecution[]
 }
 
 model Agent {
@@ -80,9 +81,42 @@ model Project {
     organizationId String?
     parentId String?
     prompts Prompt[]
+    tools Tool[]
     description String
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now())
     organizationPublic Boolean @default(false)
     threads Thread[]
+}
+
+model Tool {
+    id String @id @default(cuid())
+    name String
+    description String
+    code String @db.Text
+    parameters Json
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
+    ownerId String
+    organizationId String?
+    projectId String?
+    organizationPublic Boolean @default(false)
+    project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    executions ToolExecution[]
+}
+
+model ToolExecution {
+    id String @id @default(cuid())
+    toolId String
+    tool Tool @relation(fields: [toolId], references: [id], onDelete: Cascade)
+    threadId String
+    thread Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+    input Json
+    output String? @db.Text
+    status String // 'pending', 'completed', 'failed'
+    errorMessage String?
+    messageId String?
+    message Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
 }
